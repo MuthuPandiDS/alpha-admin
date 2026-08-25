@@ -25,6 +25,12 @@ export function AdminShell({
             Members
           </Link>
           <Link
+            href="/qr-signup"
+            className="rounded-lg px-3 py-2 text-foreground/90 hover:bg-white/5"
+          >
+            QR sign-up
+          </Link>
+          <Link
             href="/announcements"
             className="rounded-lg px-3 py-2 text-foreground/90 hover:bg-white/5"
           >

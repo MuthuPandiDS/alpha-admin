@@ -2,6 +2,10 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+function birthday(year: number, month: number, day: number) {
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
 function daysFromNow(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -20,6 +24,13 @@ async function main() {
         name: "Aisha Rahman",
         email: "aisha.rahman@example.com",
         role: "MEMBER",
+        phone: "+91 98400 11223",
+        dateOfBirth: birthday(1994, 3, 12),
+        gender: "FEMALE",
+        emergencyContact: "Imran Rahman +91 98400 11224",
+        fitnessGoal: "Marathon training",
+        joinSource: "QR",
+        profileCompletedAt: daysFromNow(-70),
         weightKg: 62.4,
         heightCm: 168,
         paymentStatus: "PAID",
@@ -38,6 +49,11 @@ async function main() {
         name: "Marcus Chen",
         email: "marcus.chen@example.com",
         role: "MEMBER",
+        phone: "+91 90030 55112",
+        dateOfBirth: birthday(1988, 11, 2),
+        gender: "MALE",
+        fitnessGoal: "Strength",
+        profileCompletedAt: daysFromNow(-30),
         weightKg: 81.2,
         heightCm: 178,
         paymentStatus: "PAID",
@@ -49,6 +65,11 @@ async function main() {
         name: "Priya Nair",
         email: "priya.nair@example.com",
         role: "MEMBER",
+        phone: "+91 99620 74410",
+        dateOfBirth: birthday(1999, 7, 24),
+        gender: "FEMALE",
+        joinSource: "QR",
+        profileCompletedAt: daysFromNow(-120),
         weightKg: 58,
         heightCm: 160,
         paymentStatus: "OVERDUE",
