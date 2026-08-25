@@ -85,9 +85,9 @@ export const usersRouter = router({
         where.AND = [
           {
             OR: [
-              { name: { contains: input.search } },
-              { email: { contains: input.search } },
-              { phone: { contains: input.search } },
+              { name: { contains: input.search, mode: "insensitive" } },
+              { email: { contains: input.search, mode: "insensitive" } },
+              { phone: { contains: input.search, mode: "insensitive" } },
             ],
           },
         ];
