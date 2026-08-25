@@ -3,15 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { memberOnboardingSchema } from "@/lib/member-profile";
+import type { OnboardingState } from "@/lib/onboarding-state";
 import { prisma } from "@/lib/prisma";
-
-export type OnboardingState = {
-  status: "idle" | "error" | "success";
-  message?: string;
-  fieldErrors?: Record<string, string>;
-};
-
-export const initialOnboardingState: OnboardingState = { status: "idle" };
 
 export async function submitMemberProfile(
   _prevState: OnboardingState,

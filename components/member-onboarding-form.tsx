@@ -1,11 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
-import {
-  initialOnboardingState,
-  submitMemberProfile,
-} from "@/app/join/actions";
+import { submitMemberProfile } from "@/app/join/actions";
 import { GENDERS, GENDER_LABELS } from "@/lib/member-profile";
+import { initialOnboardingState } from "@/lib/onboarding-state";
 
 const fieldClass =
   "h-11 w-full rounded-lg border border-card-border bg-background px-3 text-sm outline-none focus:border-accent";
