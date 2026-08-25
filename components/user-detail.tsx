@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { PaymentBadge, PlanBadge } from "@/components/status-badges";
 import {
   GENDER_LABELS,
@@ -36,14 +36,16 @@ export function UserDetail({ userId }: { userId: string }) {
   const [weightKg, setWeightKg] = useState("");
   const [heightCm, setHeightCm] = useState("");
 
-  useEffect(() => {
-    if (!user) return;
+  const [syncedUser, setSyncedUser] = useState(user);
+
+  if (user && user !== syncedUser) {
+    setSyncedUser(user);
     setPaymentStatus(user.paymentStatus);
     setPlanExpiresAt(toDateInput(user.planExpiresAt));
     setPlanNotes(user.planNotes ?? "");
     setWeightKg(user.weightKg?.toString() ?? "");
     setHeightCm(user.heightCm?.toString() ?? "");
-  }, [user]);
+  }
 
   if (query.isLoading) {
     return <p className="text-muted">Loading member…</p>;

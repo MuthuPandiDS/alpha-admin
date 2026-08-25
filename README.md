@@ -1,5 +1,28 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Database (PostgreSQL)
+
+Prisma targets PostgreSQL. Create a database on [Render](https://render.com/docs/postgresql-creating-connecting)
+(or run one locally) and copy `.env.example` to `.env`:
+
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require"
+```
+
+Use Render's **Internal Database URL** when the app runs on Render, and the **External Database URL**
+(which requires `sslmode=require`) from your machine.
+
+```bash
+npx prisma migrate deploy   # apply migrations
+npm run db:seed             # optional demo data
+```
+
+Locally you can start Postgres with Docker:
+
+```bash
+docker run -d --name alphapg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=alpha -p 5432:5432 postgres:16
+```
+
 ## Getting Started
 
 First, run the development server:
