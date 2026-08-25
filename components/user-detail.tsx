@@ -3,6 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PaymentBadge, PlanBadge } from "@/components/status-badges";
+import {
+  GENDER_LABELS,
+  getAge,
+  JOIN_SOURCE_LABELS,
+  type Gender,
+  type JoinSource,
+} from "@/lib/member-profile";
 import { PAYMENT_STATUSES } from "@/lib/plan";
 import { trpc } from "@/lib/trpc";
 
@@ -97,6 +104,57 @@ export function UserDetail({ userId }: { userId: string }) {
           value="Not available"
           hint={user.attendance.message}
         />
+      </section>
+
+      <section className="rounded-xl border border-card-border bg-card p-5">
+        <h2 className="text-lg font-medium">Profile</h2>
+        <dl className="mt-4 grid gap-4 sm:grid-cols-3">
+          {(
+            [
+              ["Phone", user.phone],
+              [
+                "Date of birth",
+                user.dateOfBirth
+                  ? new Date(user.dateOfBirth).toLocaleDateString()
+                  : null,
+              ],
+              [
+                "Age",
+                (() => {
+                  const age = getAge(
+                    user.dateOfBirth ? new Date(user.dateOfBirth) : null,
+                  );
+                  return age === null ? null : `${age}`;
+                })(),
+              ],
+              [
+                "Gender",
+                user.gender ? GENDER_LABELS[user.gender as Gender] : null,
+              ],
+              ["Emergency contact", user.emergencyContact],
+              ["Fitness goal", user.fitnessGoal],
+              ["Address", user.address],
+              [
+                "Joined via",
+                JOIN_SOURCE_LABELS[user.joinSource as JoinSource] ??
+                  user.joinSource,
+              ],
+              [
+                "Profile completed",
+                user.profileCompletedAt
+                  ? new Date(user.profileCompletedAt).toLocaleDateString()
+                  : "Pending",
+              ],
+            ] as Array<[string, string | null]>
+          ).map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-xs uppercase tracking-wide text-muted">
+                {label}
+              </dt>
+              <dd className="mt-1 text-sm">{value ?? "—"}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       <section className="rounded-xl border border-card-border bg-card p-5">

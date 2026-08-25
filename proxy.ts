@@ -8,8 +8,10 @@ export const proxy = auth((req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = Boolean(req.auth);
   const isLogin = pathname.startsWith("/login");
+  // Member self-registration is reachable by anyone with the gym QR code.
+  const isPublic = isLogin || pathname.startsWith("/join");
 
-  if (!isLoggedIn && !isLogin) {
+  if (!isLoggedIn && !isPublic) {
     const login = new URL("/login", req.nextUrl);
     login.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(login);
