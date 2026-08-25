@@ -57,6 +57,17 @@ model User {
   planExpiresAt DateTime?
   planNotes     String?
 
+  phone            String?
+  dateOfBirth      DateTime?
+  gender           String?
+  address          String?
+  emergencyContact String?
+  fitnessGoal      String?
+  /// "ADMIN" when created from the dashboard, "QR" when self-registered via the join form.
+  joinSource       String    @default("ADMIN")
+  /// Set once the member submits the onboarding form. Null means the profile is still incomplete.
+  profileCompletedAt DateTime?
+
   accounts      Account[]
   sessions      Session[]
   measurements  BodyMeasurement[]

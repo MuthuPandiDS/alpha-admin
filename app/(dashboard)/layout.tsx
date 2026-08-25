@@ -12,7 +12,7 @@ export default async function DashboardLayout({
     redirect("/login");
   }
   if (session.user.role !== "ADMIN") {
-    redirect("/login?error=AccessDenied");
+    redirect("/join");
   }
 
   return (

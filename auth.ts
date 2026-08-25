@@ -9,10 +9,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
   trustHost: true,
-  callbacks: {
-    async signIn({ user }) {
-      return isAllowedAdminEmail(user.email);
+  events: {
+    async createUser({ user }) {
+      if (!user.id || isAllowedAdminEmail(user.email)) return;
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { joinSource: "QR" },
+      });
     },
+  },
+  callbacks: {
     async jwt({ token, user }) {
       if (!user?.email) return token;
 
@@ -23,15 +29,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       if (!dbUser) return token;
 
-      if (dbUser.role !== "ADMIN") {
+      const role = isAllowedAdminEmail(user.email) ? "ADMIN" : "MEMBER";
+
+      if (dbUser.role !== role) {
         await prisma.user.update({
           where: { id: dbUser.id },
-          data: { role: "ADMIN" },
+          data: { role },
         });
       }
 
       token.id = dbUser.id;
-      token.role = "ADMIN";
+      token.role = role;
       return token;
     },
     async session({ session, token }) {
