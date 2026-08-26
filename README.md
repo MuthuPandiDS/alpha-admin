@@ -50,6 +50,44 @@ APP_URL="https://your-app-url"
 
 If a webhook is missed, **Refresh** on the Payments page re-reads the link status from Cashfree.
 
+Set `CASHFREE_PAYMENT_METHODS` (e.g. `upi,cc,dc,nb`) to restrict the checkout to specific
+methods; leave it empty to offer everything enabled on the merchant account.
+
+## New joiners paying for themselves
+
+A member who scans the gym QR code signs in, fills the onboarding form, and lands on the
+default plan. `/join` then shows that plan, the membership expiry, and a **Pay** button that
+raises their own Cashfree link (reusing an unpaid one instead of creating duplicates) and
+sends them to the hosted checkout with UPI, cards and netbanking. While a link is open the
+page also renders it as a QR code so the member can pay from another phone, and
+**I have paid — check status** re-reads the link from Cashfree when the webhook is slow.
+Admins get the same QR next to the pending link on a member's page for counter payments.
+
+## Testing payments in the Cashfree sandbox
+
+1. Put sandbox keys (Cashfree dashboard → Developers → API keys, **Sandbox** tab) in `.env`
+   with `CASHFREE_ENV="sandbox"`, then `npm run dev`.
+2. Create plans under **Plans** and mark one **Default** — new joiners are billed on it.
+3. Open `/join` in a private window, sign in with a non-admin Google account, complete the
+   form, and press **Pay**. The dashboard route is `/users/<id>` → **Create Cashfree payment
+   link** for the same flow from the admin side.
+4. On the Cashfree checkout use the sandbox instruments
+   ([docs](https://www.cashfree.com/docs/payments/online/resources/sandbox-environment)):
+   - UPI: `testsuccess@gocash` (paid), `testfailure@gocash` (failed).
+   - Card: any listed test card, e.g. `5105105105105100`, expiry `03/2028`, CVV `123`,
+     OTP `111000`.
+   - Netbanking: TEST Bank (payment code `3333`).
+5. Cashfree returns to `/join` (members) or `/payments` (admin). The member page pulls the
+   link status on return; the Payments page has **Refresh** for the same thing.
+6. To exercise the real webhook, expose the app with a tunnel (`cloudflared tunnel --url
+   http://localhost:3000` or ngrok), set `APP_URL` to that HTTPS URL, restart, and register
+   `<APP_URL>/api/cashfree/webhook` as a payment-link webhook in the Cashfree dashboard.
+   Signature verification uses `CASHFREE_SECRET_KEY` unless `CASHFREE_WEBHOOK_SECRET` is set,
+   so requests signed with the wrong secret are rejected with 401.
+
+A paid link flips the payment to PAID, sets the member to PAID, and extends `planExpiresAt`
+by the plan duration; paying again before expiry adds days on top instead of restarting.
+
 ## Getting Started
 
 First, run the development server:
