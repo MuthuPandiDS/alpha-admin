@@ -68,16 +68,98 @@ model User {
   /// Set once the member submits the onboarding form. Null means the profile is still incomplete.
   profileCompletedAt DateTime?
 
+  /// Membership plan the member is currently billed on.
+  planId String?
+  plan   MembershipPlan? @relation("UserCurrentPlan", fields: [planId], references: [id], onDelete: SetNull)
+
   accounts      Account[]
   sessions      Session[]
   measurements  BodyMeasurement[]
   announcements Announcement[]
+  planEligibilities PlanEligibility[]
+  payments          Payment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([role])
   @@index([planExpiresAt])
+  @@index([planId])
+}
+
+/// A membership plan the admin sells, e.g. "New joiner 3 months" or "Legacy annual".
+model MembershipPlan {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  /// Price in paise so money is never stored as a float.
+  priceInPaise Int
+  currency     String @default("INR")
+  /// How many days the plan extends a membership when a payment succeeds.
+  durationDays Int
+  /// Plan handed to members who have no explicit plan. At most one plan can be the default.
+  isDefault    Boolean @default(false)
+  isActive     Boolean @default(true)
+  /// When true only members listed in PlanEligibility may be put on this plan.
+  isRestricted Boolean @default(false)
+
+  members      User[]            @relation("UserCurrentPlan")
+  eligibleUsers PlanEligibility[]
+  payments      Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+/// Grants one member access to one restricted plan.
+model PlanEligibility {
+  id     String @id @default(cuid())
+  userId String
+  planId String
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan   MembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, planId])
+  @@index([planId])
+}
+
+/// A Cashfree payment link raised for a member's plan, tracked end to end inside the app.
+model Payment {
+  id     String @id @default(cuid())
+  userId String
+  planId String?
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan   MembershipPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  amountInPaise Int
+  currency      String @default("INR")
+  /// PENDING | PAID | PARTIALLY_PAID | FAILED | EXPIRED | CANCELLED
+  status        String @default("PENDING")
+  /// "CASHFREE" for gateway collections, "MANUAL" for cash or offline entries.
+  provider      String @default("CASHFREE")
+
+  /// link_id sent to Cashfree; unique so webhook replays are idempotent.
+  cashfreeLinkId  String? @unique
+  cashfreeCfLinkId String?
+  linkUrl         String?
+  cashfreeOrderId String?
+  amountPaidInPaise Int   @default(0)
+  notes           String?
+  /// Last webhook or status-refresh payload, kept for reconciliation.
+  rawPayload      Json?
+
+  paidAt    DateTime?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 /// Snapshot history for GYM-11 progress analytics. Current values also live on User.
