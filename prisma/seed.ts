@@ -16,7 +16,40 @@ function daysFromNow(days: number) {
 async function main() {
   await prisma.bodyMeasurement.deleteMany();
   await prisma.announcement.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.planEligibility.deleteMany();
   await prisma.user.deleteMany({ where: { role: "MEMBER" } });
+  await prisma.membershipPlan.deleteMany();
+
+  const standardPlan = await prisma.membershipPlan.create({
+    data: {
+      name: "Standard monthly",
+      description: "Default plan every new member starts on.",
+      priceInPaise: 150_000,
+      durationDays: 30,
+      isDefault: true,
+    },
+  });
+
+  const newJoinerPlan = await prisma.membershipPlan.create({
+    data: {
+      name: "New joiner – 3 months",
+      description: "Discounted quarterly plan for members who joined this month.",
+      priceInPaise: 350_000,
+      durationDays: 90,
+      isRestricted: true,
+    },
+  });
+
+  await prisma.membershipPlan.create({
+    data: {
+      name: "Legacy annual",
+      description: "Grandfathered pricing for long-standing members.",
+      priceInPaise: 1_200_000,
+      durationDays: 365,
+      isRestricted: true,
+    },
+  });
 
   const members = await Promise.all([
     prisma.user.create({
@@ -112,6 +145,21 @@ async function main() {
     }),
   ]);
 
+  await prisma.user.updateMany({
+    where: { role: "MEMBER", planId: null },
+    data: { planId: standardPlan.id },
+  });
+
+  // Newest sign-ups get access to the discounted quarterly plan.
+  const newJoiners = members.slice(-2);
+  await prisma.planEligibility.createMany({
+    data: newJoiners.map((member) => ({
+      userId: member.id,
+      planId: newJoinerPlan.id,
+    })),
+    skipDuplicates: true,
+  });
+
   const staff =
     (await prisma.user.findFirst({ where: { role: "ADMIN" } })) ??
     (await prisma.user.create({
@@ -133,7 +181,9 @@ async function main() {
     },
   });
 
-  console.log(`Seeded ${members.length} members and 1 announcement.`);
+  console.log(
+    `Seeded ${members.length} members, 3 plans, and 1 announcement.`,
+  );
 }
 
 main()
