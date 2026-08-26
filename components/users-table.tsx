@@ -199,6 +199,7 @@ export function UsersTable() {
               <th className={columnClass}>Gender</th>
               <th className={columnClass}>Height</th>
               <th className={columnClass}>Weight</th>
+              <th className={columnClass}>Membership</th>
               <th className={columnClass}>Plan</th>
               <th className={columnClass}>
                 <button type="button" onClick={() => toggleSort("planExpiresAt")}>
@@ -218,7 +219,7 @@ export function UsersTable() {
           <tbody>
             {query.isLoading ? (
               <tr>
-                <td colSpan={13} className="px-4 py-10 text-center text-muted">
+                <td colSpan={14} className="px-4 py-10 text-center text-muted">
                   Loading members…
                 </td>
               </tr>
@@ -260,6 +261,9 @@ export function UsersTable() {
                     </td>
                     <td className={`${columnClass} text-muted`}>
                       {user.weightKg ? `${user.weightKg} kg` : "—"}
+                    </td>
+                    <td className={`${columnClass} text-muted`}>
+                      {user.plan?.name ?? "—"}
                     </td>
                     <td className={columnClass}>
                       <PlanBadge status={user.planStatus} />
@@ -312,7 +316,7 @@ export function UsersTable() {
               })
             ) : (
               <tr>
-                <td colSpan={13} className="px-4 py-10 text-center text-muted">
+                <td colSpan={14} className="px-4 py-10 text-center text-muted">
                   No members match these filters.
                 </td>
               </tr>

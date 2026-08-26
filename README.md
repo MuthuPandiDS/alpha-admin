@@ -23,6 +23,33 @@ Locally you can start Postgres with Docker:
 docker run -d --name alphapg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=alpha -p 5432:5432 postgres:16
 ```
 
+## Membership plans & Cashfree payments
+
+Plans live under **Plans** in the dashboard. Each plan has a price, a duration in days,
+and two flags:
+
+- **Default** — the plan every new member (admin-created or QR sign-up) starts on. Only one plan can be default.
+- **Restricted** — only members added to the plan's eligibility list can be put on it, which is how a
+  discounted "new joiner" plan stays away from existing members while they continue on their old plan.
+
+From a member's page you can switch their plan (only eligible plans are listed), raise a
+Cashfree payment link, or record an offline cash/UPI payment. Every collection is stored in
+the `Payment` table and listed under **Payments**.
+
+When a link is paid, Cashfree calls `POST /api/cashfree/webhook`; the app verifies the
+`x-webhook-signature` header, marks the payment PAID, and extends `planExpiresAt` by the
+plan's duration (from the current expiry if the membership is still running). Configure that
+URL as a payment-link webhook in the Cashfree dashboard, and set:
+
+```bash
+CASHFREE_APP_ID="..."
+CASHFREE_SECRET_KEY="..."
+CASHFREE_ENV="sandbox"      # or "production"
+APP_URL="https://your-app-url"
+```
+
+If a webhook is missed, **Refresh** on the Payments page re-reads the link status from Cashfree.
+
 ## Getting Started
 
 First, run the development server:

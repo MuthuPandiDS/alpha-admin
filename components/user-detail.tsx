@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { MemberBilling } from "@/components/member-billing";
 import { PaymentBadge, PlanBadge } from "@/components/status-badges";
 import {
   GENDER_LABELS,
@@ -91,6 +92,7 @@ export function UserDetail({ userId }: { userId: string }) {
           label="Height"
           value={user.heightCm != null ? `${user.heightCm} cm` : "—"}
         />
+        <Stat label="Plan" value={user.plan?.name ?? "No plan"} />
         <Stat
           label="Days remaining"
           value={
@@ -158,6 +160,13 @@ export function UserDetail({ userId }: { userId: string }) {
           ))}
         </dl>
       </section>
+
+      <MemberBilling
+        userId={user.id}
+        currentPlanId={user.planId}
+        payments={user.payments}
+        onChange={() => query.refetch()}
+      />
 
       <section className="rounded-xl border border-card-border bg-card p-5">
         <h2 className="text-lg font-medium">Override plan</h2>

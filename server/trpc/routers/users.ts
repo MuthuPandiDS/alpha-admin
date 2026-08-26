@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
+import { getDefaultPlanId } from "@/lib/default-plan";
 import { adminMemberSchema, JOIN_SOURCES } from "@/lib/member-profile";
 import {
   getDaysRemaining,
@@ -34,6 +35,16 @@ const memberSelect = {
   joinSource: true,
   profileCompletedAt: true,
   createdAt: true,
+  planId: true,
+  plan: {
+    select: {
+      id: true,
+      name: true,
+      priceInPaise: true,
+      currency: true,
+      durationDays: true,
+    },
+  },
 } satisfies Prisma.UserSelect;
 
 function toMemberData(input: z.infer<typeof adminMemberSchema>) {
@@ -130,6 +141,12 @@ export const usersRouter = router({
             orderBy: { recordedAt: "desc" },
             take: 12,
           },
+          plan: true,
+          payments: {
+            orderBy: { createdAt: "desc" },
+            take: 10,
+            include: { plan: { select: { id: true, name: true } } },
+          },
         },
       });
 
@@ -157,6 +174,9 @@ export const usersRouter = router({
         paymentStatus: user.paymentStatus,
         planExpiresAt: user.planExpiresAt,
         planNotes: user.planNotes,
+        planId: user.planId,
+        plan: user.plan,
+        payments: user.payments,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
         planStatus: getPlanStatus(user.planExpiresAt, now),
@@ -185,10 +205,12 @@ export const usersRouter = router({
       }
 
       const data = toMemberData(input);
+      const defaultPlanId = await getDefaultPlanId(ctx.prisma);
       const user = await ctx.prisma.user.create({
         data: {
           ...data,
           role: "MEMBER",
+          ...(defaultPlanId ? { planId: defaultPlanId } : {}),
           joinSource: "ADMIN",
           profileCompletedAt: new Date(),
           ...(data.weightKg !== null || data.heightCm !== null

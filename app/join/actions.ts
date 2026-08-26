@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
+import { getDefaultPlanId } from "@/lib/default-plan";
 import { memberOnboardingSchema } from "@/lib/member-profile";
 import type { OnboardingState } from "@/lib/onboarding-state";
 import { prisma } from "@/lib/prisma";
@@ -33,10 +34,16 @@ export async function submitMemberProfile(
   }
 
   const profile = parsed.data;
+  const current = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { planId: true },
+  });
+  const defaultPlanId = current?.planId ? null : await getDefaultPlanId(prisma);
 
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
+      ...(defaultPlanId ? { planId: defaultPlanId } : {}),
       name: profile.name,
       phone: profile.phone,
       dateOfBirth: profile.dateOfBirth,
