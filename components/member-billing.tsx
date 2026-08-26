@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PaymentQr } from "@/components/payment-qr";
 import { PaymentStatusBadge } from "@/components/payments-table";
 import { formatMoney, rupeesToPaise } from "@/lib/membership";
 import { trpc } from "@/lib/trpc";
@@ -117,6 +118,16 @@ export function MemberBilling({
           </a>
         ) : null}
       </div>
+      {latestLink?.linkUrl ? (
+        <div className="mt-4 flex items-center gap-4">
+          <PaymentQr url={latestLink.linkUrl} />
+          <p className="text-sm text-muted">
+            Let the member scan this at the counter to pay by UPI, card or
+            netbanking. The membership extends automatically once Cashfree
+            confirms the payment.
+          </p>
+        </div>
+      ) : null}
       {config.data && !config.data.cashfreeConfigured ? (
         <p className="mt-2 text-sm text-warn">
           Add CASHFREE_APP_ID and CASHFREE_SECRET_KEY to enable gateway collection.
