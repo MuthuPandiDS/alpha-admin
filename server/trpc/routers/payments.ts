@@ -2,19 +2,17 @@ import { randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
-import {
-  CashfreeError,
-  createPaymentLink,
-  fetchPaymentLink,
-  isCashfreeConfigured,
-  mapLinkStatus,
-} from "@/lib/cashfree";
+import { CashfreeError, isCashfreeConfigured } from "@/lib/cashfree";
 import { PAYMENT_RECORD_STATUSES } from "@/lib/membership";
-import { settlePaymentFromLink } from "@/server/payments";
+import {
+  issuePaymentLink,
+  PaymentRequestError,
+  refreshPaymentFromCashfree,
+  settlePaymentFromLink,
+} from "@/server/payments";
+import { PlanNotAllowedError } from "@/server/plans";
 import { adminProcedure, router } from "../init";
 import { assertPlanAllowedForUser } from "./plans";
-
-const LINK_VALID_DAYS = 7;
 
 const paymentSelect = {
   id: true,
@@ -35,12 +33,6 @@ const paymentSelect = {
   user: { select: { id: true, name: true, email: true, phone: true } },
   plan: { select: { id: true, name: true, durationDays: true } },
 } satisfies Prisma.PaymentSelect;
-
-function toPaise(amount: number | string | undefined): number | undefined {
-  if (amount === undefined) return undefined;
-  const value = typeof amount === "number" ? amount : Number(amount);
-  return Number.isFinite(value) ? Math.round(value * 100) : undefined;
-}
 
 export const paymentsRouter = router({
   config: adminProcedure.query(() => ({
@@ -100,72 +92,26 @@ export const paymentsRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const user = await ctx.prisma.user.findUnique({
-        where: { id: input.userId },
-        select: { id: true, name: true, email: true, phone: true, planId: true },
-      });
-      if (!user) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
-      }
-
-      const planId = input.planId ?? user.planId;
-      if (!planId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Assign a plan to this member first",
-        });
-      }
-      const plan = await assertPlanAllowedForUser(ctx.prisma, user.id, planId);
-
-      const amountInPaise = input.amountInPaise ?? plan.priceInPaise;
-      if (amountInPaise <= 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Payment amount must be greater than zero",
-        });
-      }
-
-      const linkId = `alpha_${randomUUID().replace(/-/g, "").slice(0, 24)}`;
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + LINK_VALID_DAYS);
-
-      let link;
+      let created;
       try {
-        link = await createPaymentLink({
-          linkId,
-          amountInPaise,
-          currency: plan.currency,
-          purpose: `${plan.name} membership`,
-          expiresAt,
-          customer: { name: user.name, email: user.email, phone: user.phone },
-          notes: { userId: user.id, planId: plan.id },
-        });
+        created = await issuePaymentLink(ctx.prisma, input);
       } catch (error) {
         throw new TRPCError({
-          code: error instanceof CashfreeError ? "BAD_REQUEST" : "INTERNAL_SERVER_ERROR",
+          code:
+            error instanceof CashfreeError ||
+            error instanceof PaymentRequestError ||
+            error instanceof PlanNotAllowedError
+              ? "BAD_REQUEST"
+              : "INTERNAL_SERVER_ERROR",
           message:
             error instanceof Error ? error.message : "Could not create payment link",
         });
       }
 
-      const payment = await ctx.prisma.payment.create({
-        data: {
-          userId: user.id,
-          planId: plan.id,
-          amountInPaise,
-          currency: plan.currency,
-          status: mapLinkStatus(link.link_status),
-          provider: "CASHFREE",
-          cashfreeLinkId: linkId,
-          cashfreeCfLinkId: link.cf_link_id ? String(link.cf_link_id) : null,
-          linkUrl: link.link_url,
-          notes: input.notes ?? null,
-          expiresAt,
-        },
+      return ctx.prisma.payment.findUniqueOrThrow({
+        where: { id: created.id },
         select: paymentSelect,
       });
-
-      return payment;
     }),
 
   /** Pulls the latest link status from Cashfree, for when a webhook was missed. */
@@ -183,24 +129,14 @@ export const paymentsRouter = router({
         });
       }
 
-      let link;
       try {
-        link = await fetchPaymentLink(payment.cashfreeLinkId);
+        await refreshPaymentFromCashfree(ctx.prisma, payment.cashfreeLinkId);
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: error instanceof Error ? error.message : "Cashfree lookup failed",
         });
       }
-
-      await settlePaymentFromLink(ctx.prisma, {
-        linkId: payment.cashfreeLinkId,
-        status: mapLinkStatus(link.link_status),
-        amountPaidInPaise: toPaise(link.link_amount_paid),
-        cashfreeOrderId: link.order?.order_id ?? null,
-        cfLinkId: link.cf_link_id ? String(link.cf_link_id) : null,
-        rawPayload: link as unknown as Prisma.InputJsonValue,
-      });
 
       return ctx.prisma.payment.findUnique({
         where: { id: payment.id },

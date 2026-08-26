@@ -99,7 +99,18 @@ export type CreatePaymentLinkInput = {
     phone: string | null;
   };
   notes?: Record<string, string>;
+  /** Path on this app Cashfree sends the payer back to, e.g. "/join". */
+  returnPath?: string;
 };
+
+/**
+ * Methods offered on the Cashfree checkout. Empty means "whatever the merchant
+ * account has enabled", which is what most gyms want (UPI QR, cards, netbanking).
+ */
+function paymentMethods(): string | undefined {
+  const configured = process.env.CASHFREE_PAYMENT_METHODS?.trim();
+  return configured ? configured : undefined;
+}
 
 /**
  * Cashfree requires a phone number on every link. Members without one fall back to
@@ -132,7 +143,8 @@ export function createPaymentLink(
       link_notes: input.notes,
       link_meta: {
         notify_url: `${config.appUrl}/api/cashfree/webhook`,
-        return_url: `${config.appUrl}/payments`,
+        return_url: `${config.appUrl}${input.returnPath ?? "/payments"}`,
+        payment_methods: paymentMethods(),
       },
     },
   });

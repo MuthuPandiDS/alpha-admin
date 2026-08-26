@@ -1,11 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getDefaultPlanId } from "@/lib/default-plan";
 import { memberOnboardingSchema } from "@/lib/member-profile";
 import type { OnboardingState } from "@/lib/onboarding-state";
+import type { PaymentActionState } from "@/lib/payment-action-state";
 import { prisma } from "@/lib/prisma";
+import { startMemberPayment, syncMemberPayments } from "@/server/member-payments";
 
 export async function submitMemberProfile(
   _prevState: OnboardingState,
@@ -60,6 +63,53 @@ export async function submitMemberProfile(
     },
   });
 
+  revalidatePath("/join");
+  revalidatePath("/users");
+
+  return { status: "success" };
+}
+
+/**
+ * Raises (or reuses) the member's Cashfree link and sends them to the hosted
+ * checkout, where UPI, cards and netbanking are all available.
+ */
+export async function payMembership(): Promise<PaymentActionState> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return {
+      status: "error",
+      message: "Your session has expired. Please sign in with Google again.",
+    };
+  }
+
+  let checkoutUrl: string;
+  try {
+    checkoutUrl = await startMemberPayment(session.user.id);
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Could not start the payment. Please try again.",
+    };
+  }
+
+  revalidatePath("/join");
+  redirect(checkoutUrl);
+}
+
+/** Pulls the latest status from Cashfree for members whose webhook was slow. */
+export async function refreshMembershipPayment(): Promise<PaymentActionState> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return {
+      status: "error",
+      message: "Your session has expired. Please sign in with Google again.",
+    };
+  }
+
+  await syncMemberPayments(session.user.id);
   revalidatePath("/join");
   revalidatePath("/users");
 
