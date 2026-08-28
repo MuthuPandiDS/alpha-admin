@@ -1,7 +1,11 @@
+import QRCode from "qrcode";
 import { auth, signIn, signOut } from "@/auth";
 import { MemberOnboardingForm } from "@/components/member-onboarding-form";
+import { MemberPaymentPanel } from "@/components/member-payment-panel";
+import { isCashfreeConfigured } from "@/lib/cashfree";
 import { GENDER_LABELS, getAge, type Gender } from "@/lib/member-profile";
 import { prisma } from "@/lib/prisma";
+import { getMemberMembership, syncMemberPayments } from "@/server/member-payments";
 
 export const metadata = {
   title: "Join Alpha X",
@@ -21,8 +25,13 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default async function JoinPage() {
+export default async function JoinPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await auth();
+  const query = await searchParams;
 
   if (!session?.user?.id) {
     return (
@@ -100,6 +109,21 @@ export default async function JoinPage() {
 
   const age = getAge(member.dateOfBirth);
 
+  // Cashfree bounces the payer back here with the link/order in the query string,
+  // so pull the fresh status before rendering instead of waiting for the webhook.
+  if (query.link_id || query.order_id || query.cf_link_id) {
+    await syncMemberPayments(session.user.id);
+  }
+
+  const membership = await getMemberMembership(session.user.id);
+  const pendingQrSvg = membership.pendingPayment?.linkUrl
+    ? await QRCode.toString(membership.pendingPayment.linkUrl, {
+        type: "svg",
+        margin: 1,
+        errorCorrectionLevel: "M",
+      })
+    : null;
+
   return (
     <Shell>
       <h1 className="mt-3 text-3xl font-semibold tracking-tight">
@@ -135,6 +159,15 @@ export default async function JoinPage() {
           </div>
         ))}
       </dl>
+
+      <MemberPaymentPanel
+        plan={membership.plan}
+        planExpiresAt={membership.planExpiresAt}
+        payments={membership.payments}
+        pendingPayment={membership.pendingPayment}
+        pendingQrSvg={pendingQrSvg}
+        cashfreeConfigured={isCashfreeConfigured()}
+      />
 
       <form
         className="mt-8"

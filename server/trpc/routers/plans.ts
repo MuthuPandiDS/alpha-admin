@@ -1,6 +1,10 @@
 import { TRPCError } from "@trpc/server";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
+import {
+  assertPlanAllowedForUser as assertPlanAllowed,
+  PlanNotAllowedError,
+} from "@/server/plans";
 import { adminProcedure, router } from "../init";
 
 const planFields = z.object({
@@ -43,30 +47,28 @@ async function clearOtherDefaults(
   });
 }
 
+const PLAN_ERROR_CODES = {
+  not_found: "NOT_FOUND",
+  archived: "BAD_REQUEST",
+  not_eligible: "FORBIDDEN",
+} as const;
+
 export async function assertPlanAllowedForUser(
   db: PrismaClient | Prisma.TransactionClient,
   userId: string,
   planId: string,
 ) {
-  const plan = await db.membershipPlan.findUnique({ where: { id: planId } });
-  if (!plan) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Plan not found" });
-  }
-  if (!plan.isActive) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "Plan is archived" });
-  }
-  if (plan.isRestricted) {
-    const grant = await db.planEligibility.findUnique({
-      where: { userId_planId: { userId, planId } },
-    });
-    if (!grant) {
+  try {
+    return await assertPlanAllowed(db, userId, planId);
+  } catch (error) {
+    if (error instanceof PlanNotAllowedError) {
       throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "This member is not eligible for that plan",
+        code: PLAN_ERROR_CODES[error.reason],
+        message: error.message,
       });
     }
+    throw error;
   }
-  return plan;
 }
 
 export const plansRouter = router({
