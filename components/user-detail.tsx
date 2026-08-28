@@ -5,6 +5,7 @@ import { useState } from "react";
 import { MemberAvatar } from "@/components/member-avatar";
 import { MemberBilling } from "@/components/member-billing";
 import { PaymentBadge, PlanBadge } from "@/components/status-badges";
+import { Spinner } from "@/components/ui-primitives";
 import {
   GENDER_LABELS,
   getAge,
@@ -50,7 +51,11 @@ export function UserDetail({ userId }: { userId: string }) {
   }
 
   if (query.isLoading) {
-    return <p className="text-muted">Loading member…</p>;
+    return (
+      <div className="flex h-[60vh] flex-col items-center justify-center">
+        <Spinner className="h-6 w-6 text-accent" />
+      </div>
+    );
   }
 
   if (query.error || !user) {

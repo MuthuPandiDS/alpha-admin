@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { MemberAvatar } from "@/components/member-avatar";
-import { DropdownSelect, SearchInput, Button } from "@/components/ui-primitives";
+import { DropdownSelect, SearchInput, Button, Spinner } from "@/components/ui-primitives";
 import {
   MemberFormDialog,
   toFormValues,
@@ -208,8 +208,10 @@ export function UsersTable() {
           <tbody>
             {query.isLoading ? (
               <tr>
-                <td colSpan={14} className="px-4 py-10 text-center text-muted">
-                  Loading members…
+                <td colSpan={14} className="h-[60vh] text-center">
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <Spinner className="h-6 w-6 text-accent" />
+                  </div>
                 </td>
               </tr>
             ) : query.data?.items.length ? (

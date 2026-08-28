@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { formatMoney, paiseToRupees, rupeesToPaise } from "@/lib/membership";
 import { trpc } from "@/lib/trpc";
+import { Button, SearchInput } from "@/components/ui-primitives";
+import { MemberAvatar } from "@/components/member-avatar";
 
 type Draft = {
   id?: string;
@@ -25,6 +27,28 @@ function emptyDraft(): Draft {
     isRestricted: false,
     isActive: true,
   };
+}
+
+const fieldClass =
+  "h-10 w-full rounded-md border border-card-border bg-card px-3 text-xs text-foreground/90 outline-none transition placeholder:text-muted/60 focus:border-accent focus:ring-1 focus:ring-accent/30";
+const areaClass =
+  "w-full rounded-md border border-card-border bg-card px-3 py-2 text-xs text-foreground/90 outline-none transition placeholder:text-muted/60 focus:border-accent focus:ring-1 focus:ring-accent/30";
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-medium uppercase tracking-wider text-muted">
+        {label}
+      </span>
+      <div className="mt-1.5">{children}</div>
+    </label>
+  );
 }
 
 export function PlansManager() {
@@ -75,215 +99,232 @@ export function PlansManager() {
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
       <form
         onSubmit={submit}
-        className="h-fit space-y-4 rounded-xl border border-card-border bg-card p-5"
+        className="h-fit space-y-6 rounded-xl border border-card-border bg-card p-6"
       >
-        <h2 className="text-lg font-medium">
-          {draft.id ? "Edit plan" : "New plan"}
-        </h2>
-        <label className="grid gap-1 text-sm">
-          Plan name
-          <input
-            required
-            value={draft.name}
-            onChange={(event) =>
-              setDraft((current) => ({ ...current, name: event.target.value }))
-            }
-            placeholder="New joiner – 3 months"
-            className="h-10 rounded-lg border border-card-border bg-background px-3"
-          />
-        </label>
-        <label className="grid gap-1 text-sm">
-          Description
-          <textarea
-            rows={3}
-            value={draft.description}
-            onChange={(event) =>
-              setDraft((current) => ({ ...current, description: event.target.value }))
-            }
-            className="rounded-lg border border-card-border bg-background px-3 py-2"
-          />
-        </label>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="grid gap-1 text-sm">
-            Price (₹)
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground/90">
+            {draft.id ? "Edit plan" : "New plan"}
+          </h2>
+          <p className="mt-1 text-xs text-muted">
+            Configure the plan details and pricing.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <Field label="Plan name">
             <input
               required
-              type="number"
-              min="0"
-              step="0.01"
-              value={draft.priceRupees}
+              value={draft.name}
               onChange={(event) =>
-                setDraft((current) => ({ ...current, priceRupees: event.target.value }))
+                setDraft((current) => ({ ...current, name: event.target.value }))
               }
-              className="h-10 rounded-lg border border-card-border bg-background px-3"
+              placeholder="e.g. New joiner – 3 months"
+              className={fieldClass}
             />
-          </label>
-          <label className="grid gap-1 text-sm">
-            Duration (days)
+          </Field>
+          <Field label="Description">
+            <textarea
+              rows={3}
+              value={draft.description}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, description: event.target.value }))
+              }
+              placeholder="Optional plan details..."
+              className={areaClass}
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Price (₹)">
+              <input
+                required
+                type="number"
+                min="0"
+                step="0.01"
+                value={draft.priceRupees}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, priceRupees: event.target.value }))
+                }
+                className={fieldClass}
+              />
+            </Field>
+            <Field label="Duration (days)">
+              <input
+                required
+                type="number"
+                min="1"
+                value={draft.durationDays}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, durationDays: event.target.value }))
+                }
+                className={fieldClass}
+              />
+            </Field>
+          </div>
+        </div>
+
+        <div className="space-y-3 pt-2">
+          <label className="flex cursor-pointer items-start gap-3">
             <input
-              required
-              type="number"
-              min="1"
-              value={draft.durationDays}
+              type="checkbox"
+              checked={draft.isDefault}
               onChange={(event) =>
-                setDraft((current) => ({ ...current, durationDays: event.target.value }))
+                setDraft((current) => ({ ...current, isDefault: event.target.checked }))
               }
-              className="h-10 rounded-lg border border-card-border bg-background px-3"
+              className="mt-1 h-4 w-4 shrink-0 rounded border-card-border accent-accent"
             />
+            <span className="text-sm text-foreground/80">
+              Default plan for new members
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={draft.isRestricted}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, isRestricted: event.target.checked }))
+              }
+              className="mt-1 h-4 w-4 shrink-0 rounded border-card-border accent-accent"
+            />
+            <span className="text-sm text-foreground/80">
+              Restricted (only selected members are eligible)
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={draft.isActive}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, isActive: event.target.checked }))
+              }
+              className="mt-1 h-4 w-4 shrink-0 rounded border-card-border accent-accent"
+            />
+            <span className="text-sm text-foreground/80">Active</span>
           </label>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={draft.isDefault}
-            onChange={(event) =>
-              setDraft((current) => ({ ...current, isDefault: event.target.checked }))
-            }
-          />
-          Default plan for new members
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={draft.isRestricted}
-            onChange={(event) =>
-              setDraft((current) => ({ ...current, isRestricted: event.target.checked }))
-            }
-          />
-          Restricted — only members you pick are eligible
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={draft.isActive}
-            onChange={(event) =>
-              setDraft((current) => ({ ...current, isActive: event.target.checked }))
-            }
-          />
-          Active
-        </label>
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={create.isPending || update.isPending}
-            className="h-10 rounded-full bg-accent px-5 text-sm font-semibold text-accent-ink disabled:opacity-60"
-          >
-            {draft.id ? "Save changes" : "Create plan"}
-          </button>
-          {draft.id ? (
-            <button
-              type="button"
-              onClick={() => setDraft(emptyDraft())}
-              className="h-10 rounded-full border border-card-border px-4 text-sm"
-            >
-              Cancel
-            </button>
-          ) : null}
-        </div>
+
         {create.error || update.error ? (
-          <p className="text-sm text-danger">
+          <p className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
             {create.error?.message ?? update.error?.message}
           </p>
         ) : null}
+
+        <div className="flex justify-end gap-3 border-t border-card-border pt-6">
+          {draft.id ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDraft(emptyDraft())}
+            >
+              Cancel
+            </Button>
+          ) : null}
+          <Button type="submit" disabled={create.isPending || update.isPending}>
+            {draft.id ? "Save changes" : "Create plan"}
+          </Button>
+        </div>
       </form>
 
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-sm text-muted">
+      <div className="flex min-w-0 flex-col gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
             <input
               type="checkbox"
               checked={includeArchived}
               onChange={(event) => setIncludeArchived(event.target.checked)}
+              className="h-4 w-4 rounded border-card-border accent-accent"
             />
             Show archived plans
           </label>
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => backfill.mutate()}
             disabled={backfill.isPending}
-            className="h-9 rounded-full border border-card-border px-4 text-sm disabled:opacity-60"
           >
-            Put members without a plan on the default
-          </button>
+            Apply default to members without plans
+          </Button>
         </div>
+        
         {backfill.error ? (
-          <p className="text-sm text-danger">{backfill.error.message}</p>
+          <p className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{backfill.error.message}</p>
         ) : null}
         {backfill.data ? (
-          <p className="text-sm text-accent">
+          <p className="rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-sm text-accent">
             {backfill.data.updated} member(s) moved to the default plan.
           </p>
         ) : null}
 
         {plans.data?.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-card-border px-4 py-10 text-center text-sm text-muted">
-            No plans yet. Create your first membership plan on the left.
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-card-border py-20 text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-4 text-muted/50"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+            <h3 className="text-lg font-medium text-foreground">No plans created yet</h3>
+            <p className="mt-1 text-sm text-muted">Create your first membership plan on the left.</p>
           </div>
         ) : null}
 
-        <ul className="space-y-3">
+        <ul className="grid gap-4 xl:grid-cols-2">
           {plans.data?.map((plan) => (
             <li
               key={plan.id}
-              className="rounded-xl border border-card-border bg-card p-4"
+              className="group flex flex-col justify-between overflow-hidden rounded-xl border border-card-border bg-card transition hover:border-foreground/20"
             >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="flex flex-wrap items-center gap-2 font-medium">
-                    {plan.name}
-                    {plan.isDefault ? (
-                      <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent">
-                        default
+              <div className="p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <h3 className="font-semibold text-foreground/90">{plan.name}</h3>
+                  <div className="flex shrink-0 gap-2">
+                    {plan.isDefault && (
+                      <span className="rounded bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent">
+                        Default
                       </span>
-                    ) : null}
-                    {plan.isRestricted ? (
-                      <span className="rounded-full bg-warn/15 px-2 py-0.5 text-xs text-warn">
-                        restricted
+                    )}
+                    {plan.isRestricted && (
+                      <span className="rounded bg-warn/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-warn">
+                        Restricted
                       </span>
-                    ) : null}
-                    {!plan.isActive ? (
-                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-muted">
-                        archived
+                    )}
+                    {!plan.isActive && (
+                      <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                        Archived
                       </span>
-                    ) : null}
-                  </p>
-                  <p className="mt-1 text-sm text-muted">
-                    {formatMoney(plan.priceInPaise, plan.currency)} ·{" "}
-                    {plan.durationDays} days · {plan.memberCount} member(s)
-                    {plan.isRestricted ? ` · ${plan.eligibleCount} eligible` : ""}
-                  </p>
-                  {plan.description ? (
-                    <p className="mt-2 text-sm text-muted">{plan.description}</p>
-                  ) : null}
+                    )}
+                  </div>
                 </div>
-                <div className="flex shrink-0 flex-wrap gap-3 text-sm">
-                  {plan.isRestricted ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEligibilityPlanId(
-                          eligibilityPlanId === plan.id ? null : plan.id,
-                        )
-                      }
-                      className="text-muted hover:text-foreground"
-                    >
-                      Eligibility
-                    </button>
-                  ) : null}
-                  {!plan.isDefault && plan.isActive && !plan.isRestricted ? (
-                    <button
-                      type="button"
-                      onClick={() => setDefault.mutate({ id: plan.id })}
-                      className="text-muted hover:text-foreground"
-                    >
-                      Make default
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
+
+                <div className="mt-5 flex items-baseline gap-1">
+                  <span className="text-3xl font-bold tracking-tight text-foreground">
+                    {formatMoney(plan.priceInPaise, plan.currency)}
+                  </span>
+                  <span className="text-sm font-medium text-muted">/ {plan.durationDays} days</span>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  {plan.description && (
+                    <p className="text-sm text-muted">{plan.description}</p>
+                  )}
+                  
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-medium text-muted">
+                    <div className="flex items-center gap-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      {plan.memberCount} active
+                    </div>
+                    {plan.isRestricted && (
+                      <div className="flex items-center gap-1.5 text-warn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                        {plan.eligibleCount} eligible
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-card-border bg-black/20 px-6 py-4">
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() =>
                       setDraft({
                         id: plan.id,
@@ -296,38 +337,60 @@ export function PlansManager() {
                         isActive: plan.isActive,
                       })
                     }
-                    className="text-muted hover:text-foreground"
                   >
                     Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm(`Delete or archive "${plan.name}"?`)) {
-                        remove.mutate({ id: plan.id });
-                      }
-                    }}
-                    className="text-danger"
-                  >
-                    Delete
-                  </button>
+                  </Button>
+                  {!plan.isDefault && plan.isActive && !plan.isRestricted && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDefault.mutate({ id: plan.id })}
+                    >
+                      Make Default
+                    </Button>
+                  )}
+                  {plan.isRestricted && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEligibilityPlanId(plan.id)}
+                    >
+                      Manage Eligibility
+                    </Button>
+                  )}
                 </div>
-              </div>
-
-              {eligibilityPlanId === plan.id ? (
-                <EligibilityEditor
-                  planId={plan.id}
-                  selectedIds={plan.eligibleUsers.map((user) => user.id)}
-                  onSaved={() => {
-                    invalidate();
-                    setEligibilityPlanId(null);
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm(`Delete or archive "${plan.name}"?`)) {
+                      remove.mutate({ id: plan.id });
+                    }
                   }}
-                />
-              ) : null}
+                >
+                  Delete
+                </Button>
+              </div>
             </li>
           ))}
         </ul>
       </div>
+
+      {eligibilityPlanId && (
+        <EligibilityEditor
+          planId={eligibilityPlanId}
+          selectedIds={
+            plans.data
+              ?.find((p) => p.id === eligibilityPlanId)
+              ?.eligibleUsers.map((u) => u.id) ?? []
+          }
+          onSaved={() => {
+            invalidate();
+            setEligibilityPlanId(null);
+          }}
+          onCancel={() => setEligibilityPlanId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -336,10 +399,12 @@ function EligibilityEditor({
   planId,
   selectedIds,
   onSaved,
+  onCancel,
 }: {
   planId: string;
   selectedIds: string[];
   onSaved: () => void;
+  onCancel: () => void;
 }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>(selectedIds);
@@ -364,43 +429,71 @@ function EligibilityEditor({
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-card-border bg-background p-4">
-      <p className="text-sm text-muted">
-        Pick the members allowed to buy this plan. Everyone else keeps their
-        current plan.
-      </p>
-      <input
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        placeholder="Search members"
-        className="mt-3 h-10 w-full rounded-lg border border-card-border bg-card px-3 text-sm"
-      />
-      <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto text-sm">
-        {members.data?.items.map((member) => (
-          <li key={member.id}>
-            <label className="flex items-center gap-2 rounded px-1 py-1 hover:bg-white/5">
-              <input
-                type="checkbox"
-                checked={selected.includes(member.id)}
-                onChange={() => toggle(member.id)}
-              />
-              <span>{member.name ?? "Unnamed"}</span>
-              <span className="text-muted">{member.email}</span>
-            </label>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-3 flex items-center gap-3">
-        <button
-          type="button"
-          disabled={save.isPending}
-          onClick={() => save.mutate({ planId, userIds: selected })}
-          className="h-9 rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-60"
-        >
-          {save.isPending ? "Saving…" : `Save ${selected.length} member(s)`}
-        </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-md overflow-hidden rounded-xl border border-card-border bg-card p-6 shadow-2xl">
+        <div className="flex items-start justify-between">
+          <div>
+            <h4 className="font-medium text-foreground">Select Eligible Members</h4>
+            <p className="mt-1 text-xs text-muted">
+              Everyone else will keep their current plan.
+            </p>
+          </div>
+          <button type="button" onClick={onCancel} className="text-muted hover:text-foreground">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        
+        <div className="mt-4">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search members by name or email"
+            className="w-full"
+          />
+        </div>
+
+        <ul className="mt-4 max-h-[50vh] space-y-1 overflow-y-auto pr-2 table-scroll-container">
+          {members.data?.items.map((member) => (
+            <li key={member.id}>
+              <label className="flex cursor-pointer items-center justify-between rounded-lg p-2 transition hover:bg-white/5">
+                <div className="flex items-center gap-3">
+                  <MemberAvatar src={member.image} name={member.name} size="h-8 w-8" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-foreground/90">
+                      {member.name ?? "Unnamed"}
+                    </span>
+                    <span className="text-xs text-muted">{member.email}</span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={selected.includes(member.id)}
+                  onChange={() => toggle(member.id)}
+                  className="h-4 w-4 rounded border-card-border accent-accent"
+                />
+              </label>
+            </li>
+          ))}
+          {members.data?.items.length === 0 && (
+            <li className="py-4 text-center text-sm text-muted">No members found</li>
+          )}
+        </ul>
+        
+        <div className="mt-5 flex items-center justify-between border-t border-card-border/50 pt-4">
+          <span className="text-xs font-medium text-muted">
+            {selected.length} selected
+          </span>
+          <Button
+            type="button"
+            disabled={save.isPending}
+            onClick={() => save.mutate({ planId, userIds: selected })}
+          >
+            {save.isPending ? "Saving…" : "Save Eligibility"}
+          </Button>
+        </div>
+        
         {save.error ? (
-          <p className="text-sm text-danger">{save.error.message}</p>
+          <p className="mt-3 text-xs text-danger">{save.error.message}</p>
         ) : null}
       </div>
     </div>
