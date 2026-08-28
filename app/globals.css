@@ -10,6 +10,7 @@
   --accent-ink: #12150c;
   --danger: #ff6b6b;
   --warn: #f0c14b;
+  color-scheme: dark;
 }
 
 @theme inline {

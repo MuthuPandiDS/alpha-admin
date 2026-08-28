@@ -1,30 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   GENDERS,
   GENDER_LABELS,
+  adminMemberSchema,
   toDateInputValue,
 } from "@/lib/member-profile";
 import { PAYMENT_STATUSES, type PaymentStatus } from "@/lib/plan";
 import { trpc } from "@/lib/trpc";
+import { Button, DropdownSelect } from "@/components/ui-primitives";
 
-export type MemberFormValues = {
-  id?: string;
-  name: string;
-  email: string;
-  phone: string;
-  dateOfBirth: string;
-  gender: string;
-  heightCm: string;
-  weightKg: string;
-  address: string;
-  emergencyContact: string;
-  fitnessGoal: string;
-  paymentStatus: PaymentStatus;
-  planExpiresAt: string;
-  planNotes: string;
-};
+export type MemberFormValues = z.input<typeof adminMemberSchema> & { id?: string };
 
 export type MemberRecord = {
   id: string;
@@ -83,23 +73,26 @@ export function toFormValues(member: MemberRecord): MemberFormValues {
 }
 
 const fieldClass =
-  "h-10 w-full rounded-lg border border-card-border bg-background px-3 text-sm outline-none focus:border-accent";
+  "h-10 w-full rounded-md border border-card-border bg-card px-3 text-xs text-foreground/90 outline-none transition placeholder:text-muted/60 focus:border-accent focus:ring-1 focus:ring-accent/30";
 const areaClass =
-  "w-full rounded-lg border border-card-border bg-background px-3 py-2 text-sm outline-none focus:border-accent";
+  "w-full rounded-md border border-card-border bg-card px-3 py-2 text-xs text-foreground/90 outline-none transition placeholder:text-muted/60 focus:border-accent focus:ring-1 focus:ring-accent/30";
 
 function Field({
   label,
+  error,
   children,
 }: {
   label: string;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
     <label className="block">
-      <span className="text-xs uppercase tracking-wide text-muted">
+      <span className="text-[11px] font-medium uppercase tracking-wider text-muted">
         {label}
       </span>
-      <div className="mt-1">{children}</div>
+      <div className="mt-1.5">{children}</div>
+      {error && <p className="mt-1.5 text-xs text-danger">{error}</p>}
     </label>
   );
 }
@@ -113,27 +106,25 @@ export function MemberFormDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [values, setValues] = useState<MemberFormValues>(
-    initialValues ?? emptyValues,
-  );
-  const [error, setError] = useState<string | null>(null);
-  const isEdit = Boolean(values.id);
+  const isEdit = Boolean(initialValues?.id);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<MemberFormValues>({
+    resolver: zodResolver(adminMemberSchema.extend({ id: z.string().optional() })),
+    defaultValues: initialValues ?? emptyValues,
+  });
 
   const createMember = trpc.users.create.useMutation();
   const updateMember = trpc.users.update.useMutation();
   const pending = createMember.isPending || updateMember.isPending;
 
-  function set<K extends keyof MemberFormValues>(
-    key: K,
-    value: MemberFormValues[K],
-  ) {
-    setValues((current) => ({ ...current, [key]: value }));
-  }
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
-
+  const onSubmit = async (values: any) => {
+    setSubmitError(null);
     const payload = {
       name: values.name,
       email: values.email,
@@ -151,33 +142,33 @@ export function MemberFormDialog({
     };
 
     try {
-      if (values.id) {
-        await updateMember.mutateAsync({ ...payload, id: values.id });
+      if (initialValues?.id) {
+        await updateMember.mutateAsync({ ...payload, id: initialValues.id });
       } else {
         await createMember.mutateAsync(payload);
       }
       onSaved();
     } catch (mutationError) {
-      setError(
+      setSubmitError(
         mutationError instanceof Error
           ? mutationError.message
           : "Could not save this member.",
       );
     }
-  }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4">
       <form
-        onSubmit={handleSubmit}
-        className="my-8 w-full max-w-2xl rounded-2xl border border-card-border bg-card p-6 shadow-2xl"
+        onSubmit={handleSubmit(onSubmit)}
+        className="my-8 w-full max-w-2xl rounded-xl border border-card-border bg-card p-6 shadow-2xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold tracking-tight">
+            <h2 className="text-lg font-semibold tracking-tight text-foreground/90">
               {isEdit ? "Edit member" : "Add member"}
             </h2>
-            <p className="mt-1 text-sm text-muted">
+            <p className="mt-1 text-xs text-muted">
               {isEdit
                 ? "Update the member's profile and plan details."
                 : "Create a member manually. They can still sign in with the same email later."}
@@ -186,160 +177,97 @@ export function MemberFormDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-card-border px-3 py-1 text-sm text-muted hover:text-foreground"
+            className="rounded-md p-1.5 text-muted hover:bg-white/5 hover:text-foreground"
           >
-            Close
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <Field label="Full name">
-            <input
-              value={values.name}
-              onChange={(event) => set("name", event.target.value)}
-              required
-              className={fieldClass}
+        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+          <Field label="Full name" error={errors.name?.message}>
+            <input {...register("name")} className={fieldClass} placeholder="e.g. John Doe" />
+          </Field>
+          <Field label="Email" error={errors.email?.message}>
+            <input type="email" {...register("email")} className={fieldClass} placeholder="e.g. john@example.com" />
+          </Field>
+          <Field label="Phone" error={errors.phone?.message}>
+            <input type="tel" {...register("phone")} className={fieldClass} placeholder="Optional" />
+          </Field>
+          <Field label="Date of birth" error={errors.dateOfBirth?.message}>
+            <input type="date" {...register("dateOfBirth")} className={fieldClass} />
+          </Field>
+          <Field label="Gender" error={errors.gender?.message}>
+            <Controller
+              name="gender"
+              control={control}
+              render={({ field }) => (
+                <DropdownSelect
+                  value={(field.value as string) || ""}
+                  onChange={field.onChange}
+                  options={[
+                    { value: "", label: "Unspecified" },
+                    ...GENDERS.map((g) => ({ value: g, label: GENDER_LABELS[g] })),
+                  ]}
+                  className="w-full"
+                  triggerClassName="h-10 w-full"
+                />
+              )}
             />
           </Field>
-          <Field label="Email">
-            <input
-              type="email"
-              value={values.email}
-              onChange={(event) => set("email", event.target.value)}
-              required
-              className={fieldClass}
+          <Field label="Emergency contact" error={errors.emergencyContact?.message}>
+            <input {...register("emergencyContact")} className={fieldClass} placeholder="Optional" />
+          </Field>
+          <Field label="Height (cm)" error={errors.heightCm?.message}>
+            <input type="number" step="0.1" min="1" {...register("heightCm")} className={fieldClass} placeholder="Optional" />
+          </Field>
+          <Field label="Weight (kg)" error={errors.weightKg?.message}>
+            <input type="number" step="0.1" min="1" {...register("weightKg")} className={fieldClass} placeholder="Optional" />
+          </Field>
+          <Field label="Payment status" error={errors.paymentStatus?.message}>
+            <Controller
+              name="paymentStatus"
+              control={control}
+              render={({ field }) => (
+                <DropdownSelect
+                  value={(field.value as string) || "UNPAID"}
+                  onChange={field.onChange}
+                  options={PAYMENT_STATUSES.map((s) => ({ value: s, label: s }))}
+                  className="w-full"
+                  triggerClassName="h-10 w-full"
+                />
+              )}
             />
           </Field>
-          <Field label="Phone">
-            <input
-              type="tel"
-              value={values.phone}
-              onChange={(event) => set("phone", event.target.value)}
-              className={fieldClass}
-            />
-          </Field>
-          <Field label="Date of birth">
-            <input
-              type="date"
-              value={values.dateOfBirth}
-              onChange={(event) => set("dateOfBirth", event.target.value)}
-              className={fieldClass}
-            />
-          </Field>
-          <Field label="Gender">
-            <select
-              value={values.gender}
-              onChange={(event) => set("gender", event.target.value)}
-              className={fieldClass}
-            >
-              <option value="">Unspecified</option>
-              {GENDERS.map((gender) => (
-                <option key={gender} value={gender}>
-                  {GENDER_LABELS[gender]}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Emergency contact">
-            <input
-              value={values.emergencyContact}
-              onChange={(event) => set("emergencyContact", event.target.value)}
-              className={fieldClass}
-            />
-          </Field>
-          <Field label="Height (cm)">
-            <input
-              type="number"
-              step="0.1"
-              min="1"
-              value={values.heightCm}
-              onChange={(event) => set("heightCm", event.target.value)}
-              className={fieldClass}
-            />
-          </Field>
-          <Field label="Weight (kg)">
-            <input
-              type="number"
-              step="0.1"
-              min="1"
-              value={values.weightKg}
-              onChange={(event) => set("weightKg", event.target.value)}
-              className={fieldClass}
-            />
-          </Field>
-          <Field label="Payment status">
-            <select
-              value={values.paymentStatus}
-              onChange={(event) =>
-                set("paymentStatus", event.target.value as PaymentStatus)
-              }
-              className={fieldClass}
-            >
-              {PAYMENT_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Plan expires">
-            <input
-              type="date"
-              value={values.planExpiresAt}
-              onChange={(event) => set("planExpiresAt", event.target.value)}
-              className={fieldClass}
-            />
+          <Field label="Plan expires" error={errors.planExpiresAt?.message}>
+            <input type="date" {...register("planExpiresAt")} className={fieldClass} />
           </Field>
         </div>
 
-        <div className="mt-4 space-y-4">
-          <Field label="Address">
-            <textarea
-              rows={2}
-              value={values.address}
-              onChange={(event) => set("address", event.target.value)}
-              className={areaClass}
-            />
+        <div className="mt-5 space-y-5">
+          <Field label="Address" error={errors.address?.message}>
+            <textarea rows={2} {...register("address")} className={areaClass} placeholder="Optional" />
           </Field>
-          <Field label="Fitness goal">
-            <textarea
-              rows={2}
-              value={values.fitnessGoal}
-              onChange={(event) => set("fitnessGoal", event.target.value)}
-              className={areaClass}
-            />
+          <Field label="Fitness goal" error={errors.fitnessGoal?.message}>
+            <textarea rows={2} {...register("fitnessGoal")} className={areaClass} placeholder="Optional" />
           </Field>
-          <Field label="Plan notes">
-            <textarea
-              rows={2}
-              value={values.planNotes}
-              onChange={(event) => set("planNotes", event.target.value)}
-              className={areaClass}
-            />
+          <Field label="Plan notes" error={errors.planNotes?.message}>
+            <textarea rows={2} {...register("planNotes")} className={areaClass} placeholder="Optional" />
           </Field>
         </div>
 
-        {error ? (
-          <p className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
-            {error}
+        {submitError && (
+          <p className="mt-5 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+            {submitError}
           </p>
-        ) : null}
+        )}
 
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-card-border px-5 py-2 text-sm text-muted hover:text-foreground"
-          >
+        <div className="mt-8 flex justify-end gap-3 border-t border-card-border pt-5">
+          <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-accent-ink transition hover:brightness-95 disabled:opacity-60"
-          >
+          </Button>
+          <Button type="submit" disabled={pending}>
             {pending ? "Saving…" : isEdit ? "Save changes" : "Add member"}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

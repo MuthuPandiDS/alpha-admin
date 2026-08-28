@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { MemberAvatar } from "@/components/member-avatar";
+import { DropdownSelect, SearchInput, Button } from "@/components/ui-primitives";
 import {
   MemberFormDialog,
   toFormValues,
@@ -116,67 +117,54 @@ export function UsersTable() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="flex shrink-0 flex-col gap-3 lg:flex-row lg:items-center">
-        <input
+      <div className="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-center">
+        <SearchInput
           value={searchInput}
-          onChange={(event) => setSearchInput(event.target.value)}
+          onChange={setSearchInput}
           placeholder="Search name, email or phone"
-          className="h-10 flex-1 rounded-lg border border-card-border bg-background px-3 text-sm outline-none focus:border-accent"
+          className="flex-1"
         />
-        <select
-          value={planStatus}
-          onChange={(event) => {
-            setPlanStatus(event.target.value as "all" | PlanStatus);
-            setPage(1);
-          }}
-          className="h-10 rounded-lg border border-card-border bg-background px-3 text-sm"
-        >
-          {planFilters.map((filter) => (
-            <option key={filter.value} value={filter.value}>
-              {filter.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={paymentStatus}
-          onChange={(event) => {
-            setPaymentStatus(event.target.value as "all" | PaymentStatus);
-            setPage(1);
-          }}
-          className="h-10 rounded-lg border border-card-border bg-background px-3 text-sm"
-        >
-          <option value="all">All payments</option>
-          {PAYMENT_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </select>
-        <select
-          value={joinSource}
-          onChange={(event) => {
-            setJoinSource(event.target.value as "all" | JoinSource);
-            setPage(1);
-          }}
-          className="h-10 rounded-lg border border-card-border bg-background px-3 text-sm"
-        >
-          <option value="all">All sources</option>
-          {JOIN_SOURCES.map((source) => (
-            <option key={source} value={source}>
-              {JOIN_SOURCE_LABELS[source]}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => {
-            setDialogValues(null);
-            setDialogOpen(true);
-          }}
-          className="h-10 rounded-full bg-accent px-5 text-sm font-semibold text-accent-ink transition hover:brightness-95"
-        >
-          Add member
-        </button>
+        <div className="flex items-center gap-2">
+          <DropdownSelect
+            value={planStatus}
+            options={planFilters.map((f) => ({ value: f.value, label: f.label }))}
+            onChange={(v) => {
+              setPlanStatus(v as "all" | PlanStatus);
+              setPage(1);
+            }}
+          />
+          <DropdownSelect
+            value={paymentStatus}
+            options={[
+              { value: "all", label: "All payments" },
+              ...PAYMENT_STATUSES.map((s) => ({ value: s, label: s })),
+            ]}
+            onChange={(v) => {
+              setPaymentStatus(v as "all" | PaymentStatus);
+              setPage(1);
+            }}
+          />
+          <DropdownSelect
+            value={joinSource}
+            options={[
+              { value: "all", label: "All sources" },
+              ...JOIN_SOURCES.map((s) => ({ value: s, label: JOIN_SOURCE_LABELS[s] })),
+            ]}
+            onChange={(v) => {
+              setJoinSource(v as "all" | JoinSource);
+              setPage(1);
+            }}
+          />
+          <Button
+            onClick={() => {
+              setDialogValues(null);
+              setDialogOpen(true);
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            Add member
+          </Button>
+        </div>
       </div>
 
       {actionError ? (
@@ -298,23 +286,23 @@ export function UsersTable() {
                     </td>
                     <td className={columnClass}>
                       <div className="flex gap-2">
-                        <button
-                          type="button"
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => {
                             setDialogValues(toFormValues(user));
                             setDialogOpen(true);
                           }}
-                          className="rounded-lg border border-card-border px-3 py-1 text-xs hover:border-accent hover:text-accent"
                         >
                           Edit
-                        </button>
-                        <button
-                          type="button"
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
                           onClick={() => handleDelete(user.id, user.name)}
-                          className="rounded-lg border border-danger/40 px-3 py-1 text-xs text-danger hover:bg-danger/10"
                         >
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -336,41 +324,37 @@ export function UsersTable() {
           <p>
             {total} member{total === 1 ? "" : "s"}
           </p>
-          <select
-            value={pageSize}
-            onChange={(event) => {
-              setPageSize(Number(event.target.value));
+          <DropdownSelect
+            value={pageSize.toString()}
+            options={pageSizes.map((size) => ({
+              value: size.toString(),
+              label: `${size} / page`,
+            }))}
+            onChange={(v) => {
+              setPageSize(Number(v));
               setPage(1);
             }}
-            className="h-8 rounded-lg border border-card-border bg-background px-2 text-xs"
-          >
-            {pageSizes.map((size) => (
-              <option key={size} value={size}>
-                {size} / page
-              </option>
-            ))}
-          </select>
+            placement="top"
+          />
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
+          <Button
+            variant="outline"
             disabled={page <= 1}
             onClick={() => setPage((value) => value - 1)}
-            className="rounded-lg border border-card-border px-3 py-1 disabled:opacity-40"
           >
             Previous
-          </button>
-          <span>
+          </Button>
+          <span className="min-w-[40px] text-center">
             {page} / {pageCount}
           </span>
-          <button
-            type="button"
+          <Button
+            variant="outline"
             disabled={page >= pageCount}
             onClick={() => setPage((value) => value + 1)}
-            className="rounded-lg border border-card-border px-3 py-1 disabled:opacity-40"
           >
             Next
-          </button>
+          </Button>
         </div>
       </div>
 
