@@ -38,3 +38,31 @@ textarea,
 button {
   font: inherit;
 }
+
+/* Thin scrollbar for the members table, color-matched to card bg */
+.table-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: var(--card-border) transparent;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--card-border);
+  border-radius: 3px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+.table-scroll-container::-webkit-scrollbar-corner {
+  background: transparent;
+}

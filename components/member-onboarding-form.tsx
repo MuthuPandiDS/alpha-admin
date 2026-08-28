@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { submitMemberProfile } from "@/app/join/actions";
 import { GENDERS, GENDER_LABELS } from "@/lib/member-profile";
 import { initialOnboardingState } from "@/lib/onboarding-state";
+import { PhotoUpload } from "@/components/photo-upload";
 
 const fieldClass =
   "h-11 w-full rounded-lg border border-card-border bg-background px-3 text-sm outline-none focus:border-accent";
@@ -28,6 +29,9 @@ export function MemberOnboardingForm({
 
   return (
     <form action={formAction} className="mt-8 space-y-5">
+      {/* Photo upload */}
+      <PhotoUpload />
+
       <div>
         <label htmlFor="name" className="text-sm text-muted">
           Full name

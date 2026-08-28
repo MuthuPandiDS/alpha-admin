@@ -60,6 +60,7 @@ export const memberOnboardingSchema = z.object({
   address: optionalText(300),
   emergencyContact: optionalText(120),
   fitnessGoal: optionalText(300),
+  photo: optionalText(500),
 });
 
 export type MemberOnboardingInput = z.infer<typeof memberOnboardingSchema>;

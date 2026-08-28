@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { MemberAvatar } from "@/components/member-avatar";
 import { MemberBilling } from "@/components/member-billing";
 import { PaymentBadge, PlanBadge } from "@/components/status-badges";
 import {
@@ -70,11 +71,19 @@ export function UserDetail({ userId }: { userId: string }) {
           ← Members
         </Link>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {user.name ?? "Unnamed member"}
-            </h1>
-            <p className="text-sm text-muted">{user.email}</p>
+          <div className="flex items-center gap-4">
+            <MemberAvatar
+              src={user.image}
+              name={user.name}
+              size="h-16 w-16"
+              textSize="text-xl"
+            />
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {user.name ?? "Unnamed member"}
+              </h1>
+              <p className="text-sm text-muted">{user.email}</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <PlanBadge status={user.planStatus} />

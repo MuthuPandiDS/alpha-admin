@@ -9,8 +9,8 @@ export function AdminShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-full flex-1">
-      <aside className="flex w-60 shrink-0 flex-col border-r border-card-border bg-card px-5 py-6">
+    <div className="flex h-screen overflow-hidden">
+      <aside className="flex w-60 shrink-0 flex-col border-r border-card-border bg-card px-5 py-6 overflow-y-auto">
         <Link href="/users" className="text-lg font-semibold tracking-tight">
           Alpha X
         </Link>
@@ -68,7 +68,7 @@ export function AdminShell({
           </form>
         </div>
       </aside>
-      <main className="flex-1 px-8 py-8">{children}</main>
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden px-8 py-8">{children}</main>
     </div>
   );
 }

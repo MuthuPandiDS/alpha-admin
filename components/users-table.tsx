@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { MemberAvatar } from "@/components/member-avatar";
 import {
   MemberFormDialog,
   toFormValues,
@@ -114,8 +115,8 @@ export function UsersTable() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex shrink-0 flex-col gap-3 lg:flex-row lg:items-center">
         <input
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
@@ -184,9 +185,9 @@ export function UsersTable() {
         </p>
       ) : null}
 
-      <div className="overflow-x-auto rounded-xl border border-card-border bg-card">
+      <div className="table-scroll-container min-h-0 flex-1 overflow-auto rounded-xl border border-card-border bg-card">
         <table className="w-full min-w-[1200px] text-left text-sm">
-          <thead className="border-b border-card-border text-xs uppercase tracking-wide text-muted">
+          <thead className="sticky top-0 z-10 border-b border-card-border bg-card text-xs uppercase tracking-wide text-muted">
             <tr>
               <th className={columnClass}>
                 <button type="button" onClick={() => toggleSort("name")}>
@@ -234,13 +235,18 @@ export function UsersTable() {
                     className="border-t border-card-border/80 hover:bg-white/5"
                   >
                     <td className={columnClass}>
-                      <Link
-                        href={`/users/${user.id}`}
-                        className="font-medium hover:text-accent"
-                      >
-                        {user.name ?? "Unnamed"}
-                      </Link>
-                      <p className="text-xs text-muted">{user.email}</p>
+                      <div className="flex items-center gap-3">
+                        <MemberAvatar src={user.image} name={user.name} />
+                        <div className="min-w-0">
+                          <Link
+                            href={`/users/${user.id}`}
+                            className="font-medium hover:text-accent"
+                          >
+                            {user.name ?? "Unnamed"}
+                          </Link>
+                          <p className="text-xs text-muted">{user.email}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className={`${columnClass} text-muted`}>
                       {user.phone ?? "—"}
@@ -325,7 +331,7 @@ export function UsersTable() {
         </table>
       </div>
 
-      <div className="flex flex-col gap-3 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex shrink-0 flex-col gap-3 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <p>
             {total} member{total === 1 ? "" : "s"}

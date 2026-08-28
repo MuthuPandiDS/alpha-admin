@@ -53,6 +53,7 @@ export async function submitMemberProfile(
       address: profile.address ?? null,
       emergencyContact: profile.emergencyContact ?? null,
       fitnessGoal: profile.fitnessGoal ?? null,
+      ...(profile.photo ? { image: profile.photo } : {}),
       profileCompletedAt: new Date(),
       measurements: {
         create: { weightKg: profile.weightKg, heightCm: profile.heightCm },
