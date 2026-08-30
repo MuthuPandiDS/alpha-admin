@@ -25,12 +25,6 @@ export function AdminShell({
             Members
           </Link>
           <Link
-            href="/plans"
-            className="rounded-lg px-3 py-2 text-foreground/90 hover:bg-white/5"
-          >
-            Plans
-          </Link>
-          <Link
             href="/payments"
             className="rounded-lg px-3 py-2 text-foreground/90 hover:bg-white/5"
           >
@@ -41,6 +35,12 @@ export function AdminShell({
             className="rounded-lg px-3 py-2 text-foreground/90 hover:bg-white/5"
           >
             Expenses
+          </Link>
+          <Link
+            href="/plans"
+            className="rounded-lg px-3 py-2 text-foreground/90 hover:bg-white/5"
+          >
+            Plans
           </Link>
           <Link
             href="/qr-signup"

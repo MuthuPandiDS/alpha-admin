@@ -5,29 +5,22 @@ import { formatMoney, paiseToRupees, rupeesToPaise } from "@/lib/membership";
 import { trpc } from "@/lib/trpc";
 import { Button, SearchInput } from "@/components/ui-primitives";
 import { MemberAvatar } from "@/components/member-avatar";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 
-type Draft = {
-  id?: string;
-  name: string;
-  description: string;
-  priceRupees: string;
-  durationDays: string;
-  isDefault: boolean;
-  isRestricted: boolean;
-  isActive: boolean;
-};
+const planSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, "Plan name is required"),
+  description: z.string().optional(),
+  priceRupees: z.union([z.string(), z.number()]),
+  durationDays: z.union([z.string(), z.number()]),
+  isDefault: z.boolean(),
+  isRestricted: z.boolean(),
+  isActive: z.boolean(),
+});
 
-function emptyDraft(): Draft {
-  return {
-    name: "",
-    description: "",
-    priceRupees: "",
-    durationDays: "30",
-    isDefault: false,
-    isRestricted: false,
-    isActive: true,
-  };
-}
+type PlanFormValues = z.infer<typeof planSchema>;
 
 const fieldClass =
   "h-10 w-full rounded-md border border-card-border bg-card px-3 text-xs text-foreground/90 outline-none transition placeholder:text-muted/60 focus:border-accent focus:ring-1 focus:ring-accent/30";
@@ -36,16 +29,21 @@ const areaClass =
 
 function Field({
   label,
+  error,
   children,
 }: {
   label: string;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
     <label className="block">
-      <span className="text-[11px] font-medium uppercase tracking-wider text-muted">
-        {label}
-      </span>
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted">
+          {label}
+        </span>
+        {error && <span className="text-[11px] font-medium text-danger">{error}</span>}
+      </div>
       <div className="mt-1.5">{children}</div>
     </label>
   );
@@ -60,53 +58,64 @@ export function PlansManager() {
     utils.users.invalidate();
   };
 
+  const form = useForm<PlanFormValues>({
+    resolver: zodResolver(planSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      priceRupees: 0,
+      durationDays: 30,
+      isDefault: false,
+      isRestricted: false,
+      isActive: true,
+    },
+  });
+
   const create = trpc.plans.create.useMutation({
     onSuccess: () => {
       invalidate();
-      setDraft(emptyDraft());
+      form.reset({ name: "", description: "", priceRupees: 0, durationDays: 30, isDefault: false, isRestricted: false, isActive: true });
     },
   });
   const update = trpc.plans.update.useMutation({
     onSuccess: () => {
       invalidate();
-      setDraft(emptyDraft());
+      form.reset({ name: "", description: "", priceRupees: 0, durationDays: 30, isDefault: false, isRestricted: false, isActive: true });
     },
   });
   const remove = trpc.plans.delete.useMutation({ onSuccess: invalidate });
   const setDefault = trpc.plans.setDefault.useMutation({ onSuccess: invalidate });
   const backfill = trpc.plans.backfillDefault.useMutation({ onSuccess: invalidate });
 
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [eligibilityPlanId, setEligibilityPlanId] = useState<string | null>(null);
 
-  function submit(event: React.FormEvent) {
-    event.preventDefault();
+  const onSubmit = form.handleSubmit((data) => {
     const payload = {
-      name: draft.name,
-      description: draft.description,
-      priceInPaise: rupeesToPaise(Number(draft.priceRupees || 0)),
+      name: data.name,
+      description: data.description ?? "",
+      priceInPaise: rupeesToPaise(Number(data.priceRupees)),
       currency: "INR",
-      durationDays: Number(draft.durationDays || 0),
-      isDefault: draft.isDefault,
-      isRestricted: draft.isRestricted,
-      isActive: draft.isActive,
+      durationDays: Number(data.durationDays),
+      isDefault: data.isDefault,
+      isRestricted: data.isRestricted,
+      isActive: data.isActive,
     };
-    if (draft.id) {
-      update.mutate({ id: draft.id, ...payload });
+    if (data.id) {
+      update.mutate({ id: data.id, ...payload });
     } else {
       create.mutate(payload);
     }
-  }
+  });
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
       <form
-        onSubmit={submit}
+        onSubmit={onSubmit}
         className="h-fit space-y-6 rounded-xl border border-card-border bg-card p-6"
       >
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-foreground/90">
-            {draft.id ? "Edit plan" : "New plan"}
+            {form.watch("id") ? "Edit plan" : "New plan"}
           </h2>
           <p className="mt-1 text-xs text-muted">
             Configure the plan details and pricing.
@@ -114,51 +123,36 @@ export function PlansManager() {
         </div>
 
         <div className="space-y-4">
-          <Field label="Plan name">
+          <Field label="Plan name" error={form.formState.errors.name?.message}>
             <input
-              required
-              value={draft.name}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, name: event.target.value }))
-              }
+              {...form.register("name")}
               placeholder="e.g. New joiner – 3 months"
               className={fieldClass}
             />
           </Field>
-          <Field label="Description">
+          <Field label="Description" error={form.formState.errors.description?.message}>
             <textarea
+              {...form.register("description")}
               rows={3}
-              value={draft.description}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, description: event.target.value }))
-              }
               placeholder="Optional plan details..."
               className={areaClass}
             />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Price (₹)">
+            <Field label="Price (₹)" error={form.formState.errors.priceRupees?.message}>
               <input
-                required
+                {...form.register("priceRupees")}
                 type="number"
                 min="0"
                 step="0.01"
-                value={draft.priceRupees}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, priceRupees: event.target.value }))
-                }
                 className={fieldClass}
               />
             </Field>
-            <Field label="Duration (days)">
+            <Field label="Duration (days)" error={form.formState.errors.durationDays?.message}>
               <input
-                required
+                {...form.register("durationDays")}
                 type="number"
                 min="1"
-                value={draft.durationDays}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, durationDays: event.target.value }))
-                }
                 className={fieldClass}
               />
             </Field>
@@ -169,10 +163,7 @@ export function PlansManager() {
           <label className="flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"
-              checked={draft.isDefault}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, isDefault: event.target.checked }))
-              }
+              {...form.register("isDefault")}
               className="mt-1 h-4 w-4 shrink-0 rounded border-card-border accent-accent"
             />
             <span className="text-sm text-foreground/80">
@@ -182,10 +173,7 @@ export function PlansManager() {
           <label className="flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"
-              checked={draft.isRestricted}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, isRestricted: event.target.checked }))
-              }
+              {...form.register("isRestricted")}
               className="mt-1 h-4 w-4 shrink-0 rounded border-card-border accent-accent"
             />
             <span className="text-sm text-foreground/80">
@@ -195,10 +183,7 @@ export function PlansManager() {
           <label className="flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"
-              checked={draft.isActive}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, isActive: event.target.checked }))
-              }
+              {...form.register("isActive")}
               className="mt-1 h-4 w-4 shrink-0 rounded border-card-border accent-accent"
             />
             <span className="text-sm text-foreground/80">Active</span>
@@ -212,17 +197,17 @@ export function PlansManager() {
         ) : null}
 
         <div className="flex justify-end gap-3 border-t border-card-border pt-6">
-          {draft.id ? (
+          {form.watch("id") ? (
             <Button
               type="button"
               variant="ghost"
-              onClick={() => setDraft(emptyDraft())}
+              onClick={() => form.reset({ name: "", description: "", priceRupees: 0, durationDays: 30, isDefault: false, isRestricted: false, isActive: true, id: undefined })}
             >
               Cancel
             </Button>
           ) : null}
           <Button type="submit" disabled={create.isPending || update.isPending}>
-            {draft.id ? "Save changes" : "Create plan"}
+            {form.watch("id") ? "Save changes" : "Create plan"}
           </Button>
         </div>
       </form>
@@ -325,18 +310,19 @@ export function PlansManager() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() =>
-                      setDraft({
+                    onClick={() => {
+                      form.reset({
                         id: plan.id,
                         name: plan.name,
                         description: plan.description ?? "",
-                        priceRupees: String(paiseToRupees(plan.priceInPaise)),
-                        durationDays: String(plan.durationDays),
+                        priceRupees: paiseToRupees(plan.priceInPaise),
+                        durationDays: plan.durationDays,
                         isDefault: plan.isDefault,
                         isRestricted: plan.isRestricted,
                         isActive: plan.isActive,
-                      })
-                    }
+                      });
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
                   >
                     Edit
                   </Button>

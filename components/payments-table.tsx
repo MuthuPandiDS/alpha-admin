@@ -165,7 +165,7 @@ export function PaymentsTable() {
     rowSelection.size === payments.data?.items.length;
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {config.data && !config.data.cashfreeConfigured ? (
         <p className="rounded-lg border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-warn">
           Cashfree keys are missing. Set CASHFREE_APP_ID and CASHFREE_SECRET_KEY to
@@ -249,7 +249,7 @@ export function PaymentsTable() {
         </div>
       </div>
 
-      <div className="table-scroll-container overflow-x-auto rounded-xl border border-card-border bg-card">
+      <div className="table-scroll-container min-h-0 flex-1 overflow-auto rounded-xl border border-card-border bg-card">
         <table className="w-full min-w-[52rem] text-left text-sm">
           <thead className="sticky top-0 z-10 border-b border-card-border bg-card text-xs uppercase tracking-wide text-muted">
             <tr>
