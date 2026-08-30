@@ -213,3 +213,82 @@ export function Spinner({ className = "h-5 w-5" }: { className?: string }) {
     </svg>
   );
 }
+
+/* ─────────────────────────── Checkbox ─────────────────────────── */
+
+interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
+  checked?: boolean;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
+export function Checkbox({ className = "", ...props }: CheckboxProps) {
+  return (
+    <div className={`relative flex h-4 w-4 items-center justify-center ${className}`}>
+      <input
+        type="checkbox"
+        className="peer h-4 w-4 cursor-pointer appearance-none rounded-[4px] border border-muted/50 bg-card transition-all checked:border-accent checked:bg-accent hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 focus:ring-offset-1 focus:ring-offset-card"
+        {...props}
+      />
+      <svg
+        className="pointer-events-none absolute left-2/4 top-2/4 -translate-x-2/4 -translate-y-2/4 text-white opacity-0 transition-opacity peer-checked:opacity-100"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        width="10"
+        height="10"
+      >
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    </div>
+  );
+}
+
+/* ─────────────────────────── Popover ─────────────────────────── */
+
+interface PopoverProps {
+  trigger: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  contentClassName?: string;
+  placement?: "bottom-start" | "bottom-end";
+}
+
+export function Popover({
+  trigger,
+  children,
+  className = "",
+  contentClassName = "",
+  placement = "bottom-start",
+}: PopoverProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  return (
+    <div ref={ref} className={`relative ${className}`}>
+      <div onClick={() => setOpen(!open)}>{trigger}</div>
+      {open && (
+        <div
+          className={`absolute top-full z-40 mt-1 min-w-[200px] rounded-xl border border-card-border bg-card p-1 shadow-xl shadow-black/40 ${
+            placement === "bottom-end" ? "right-0" : "left-0"
+          } ${contentClassName}`}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -148,6 +148,65 @@ export const usersRouter = router({
       };
     }),
 
+  exportList: adminProcedure
+    .input(
+      z.object({
+        search: z.string().trim().optional(),
+        planStatus: planFilterSchema.default("all"),
+        paymentStatus: paymentFilterSchema.default("all"),
+        joinSource: joinSourceFilterSchema.default("all"),
+        leadStatus: leadStatusFilterSchema.default("all"),
+        sortBy: z
+          .enum(["name", "planExpiresAt", "createdAt", "leadFollowUpAt"])
+          .default("name"),
+        sortDir: z.enum(["asc", "desc"]).default("asc"),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const now = new Date();
+      const where: Prisma.UserWhereInput = {
+        role: "MEMBER",
+        ...planStatusWhere(input.planStatus, now),
+        ...(input.paymentStatus === "all"
+          ? {}
+          : { paymentStatus: input.paymentStatus }),
+        ...(input.joinSource === "all" ? {} : { joinSource: input.joinSource }),
+        ...(input.leadStatus === "all"
+          ? {}
+          : input.leadStatus === "NONE"
+            ? { leadStatus: null }
+            : { leadStatus: input.leadStatus }),
+      };
+
+      if (input.search) {
+        where.AND = [
+          {
+            OR: [
+              { name: { contains: input.search, mode: "insensitive" } },
+              { email: { contains: input.search, mode: "insensitive" } },
+              { phone: { contains: input.search, mode: "insensitive" } },
+            ],
+          },
+        ];
+      }
+
+      const orderBy: Prisma.UserOrderByWithRelationInput = {
+        [input.sortBy]: input.sortDir,
+      };
+
+      const rows = await ctx.prisma.user.findMany({
+        where,
+        orderBy,
+        select: memberSelect,
+      });
+
+      return rows.map((user) => ({
+        ...user,
+        planStatus: getPlanStatus(user.planExpiresAt, now),
+        daysRemaining: getDaysRemaining(user.planExpiresAt, now),
+      }));
+    }),
+
   byId: adminProcedure
     .input(z.object({ id: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
