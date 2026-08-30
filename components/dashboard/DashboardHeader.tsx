@@ -12,6 +12,7 @@ import {
   Megaphone,
 } from "lucide-react";
 import { type DashboardPeriod } from "@/lib/date-utils";
+import { DropdownSelect } from "@/components/ui-primitives";
 
 export function DashboardHeader({ userName }: { userName: string }) {
   const router = useRouter();
@@ -48,30 +49,23 @@ export function DashboardHeader({ userName }: { userName: string }) {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <CalendarDays className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-            <select
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-muted" />
+            <DropdownSelect
               value={currentPeriod}
-              onChange={handlePeriodChange}
-              className="h-10 cursor-pointer appearance-none rounded-lg border border-card-border bg-card pl-9 pr-10 text-sm font-medium outline-none transition-colors hover:border-foreground/20 focus:border-accent"
-            >
-              <option value="this_month">This Month</option>
-              <option value="last_month">Last Month</option>
-              <option value="last_3_months">Last 3 Months</option>
-              <option value="this_year">This Year</option>
-            </select>
-            <svg
-              className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 pointer-events-none text-muted"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
+              onChange={(val) => {
+                const params = new URLSearchParams(searchParams);
+                params.set("period", val);
+                router.push(`${pathname}?${params.toString()}`);
+              }}
+              options={[
+                { value: "this_month", label: "This Month" },
+                { value: "last_month", label: "Last Month" },
+                { value: "last_3_months", label: "Last 3 Months" },
+                { value: "this_year", label: "This Year" },
+              ]}
+              triggerClassName="h-10 min-w-[140px]"
+            />
           </div>
           <button
             onClick={handleRefresh}

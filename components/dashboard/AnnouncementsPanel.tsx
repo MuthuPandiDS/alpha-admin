@@ -43,8 +43,8 @@ export function AnnouncementsPanel({
           {announcements.map((a, i) => (
             <div key={i} className="flex flex-col justify-between rounded-xl border border-card-border bg-background p-5 transition-colors hover:border-foreground/20">
               <div>
-                <h3 className="font-semibold text-foreground">{a.title}</h3>
-                <p className="mt-2 line-clamp-3 text-sm text-muted">{a.body}</p>
+                <h3 className="font-semibold text-lg text-foreground">{a.title}</h3>
+                <p className="mt-2 line-clamp-3 text-sm text-muted whitespace-pre-wrap">{a.body}</p>
               </div>
               
               <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-card-border pt-4 text-xs text-muted">
