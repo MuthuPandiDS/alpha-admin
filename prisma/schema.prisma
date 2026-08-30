@@ -63,6 +63,11 @@ model User {
   address          String?
   emergencyContact String?
   fitnessGoal      String?
+  
+  // Lead tracking
+  leadStatus       String?
+  leadFollowUpAt   DateTime?
+  leadNotes        String?
   /// "ADMIN" when created from the dashboard, "QR" when self-registered via the join form.
   joinSource       String    @default("ADMIN")
   /// Set once the member submits the onboarding form. Null means the profile is still incomplete.

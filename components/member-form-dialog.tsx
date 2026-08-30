@@ -9,6 +9,8 @@ import {
   GENDER_LABELS,
   adminMemberSchema,
   toDateInputValue,
+  LEAD_STATUSES,
+  LEAD_STATUS_LABELS,
 } from "@/lib/member-profile";
 import { PAYMENT_STATUSES, type PaymentStatus } from "@/lib/plan";
 import { trpc } from "@/lib/trpc";
@@ -31,6 +33,9 @@ export type MemberRecord = {
   paymentStatus: string;
   planExpiresAt: Date | string | null;
   planNotes: string | null;
+  leadStatus: string | null;
+  leadFollowUpAt: Date | string | null;
+  leadNotes: string | null;
 };
 
 const emptyValues: MemberFormValues = {
@@ -47,6 +52,9 @@ const emptyValues: MemberFormValues = {
   paymentStatus: "UNPAID",
   planExpiresAt: "",
   planNotes: "",
+  leadStatus: "",
+  leadFollowUpAt: "",
+  leadNotes: "",
 };
 
 export function toFormValues(member: MemberRecord): MemberFormValues {
@@ -69,6 +77,9 @@ export function toFormValues(member: MemberRecord): MemberFormValues {
       : "UNPAID",
     planExpiresAt: toDateInputValue(member.planExpiresAt),
     planNotes: member.planNotes ?? "",
+    leadStatus: member.leadStatus ?? "",
+    leadFollowUpAt: toDateInputValue(member.leadFollowUpAt),
+    leadNotes: member.leadNotes ?? "",
   };
 }
 
@@ -139,6 +150,9 @@ export function MemberFormDialog({
       paymentStatus: values.paymentStatus,
       planExpiresAt: values.planExpiresAt,
       planNotes: values.planNotes,
+      leadStatus: values.leadStatus,
+      leadFollowUpAt: values.leadFollowUpAt,
+      leadNotes: values.leadNotes,
     };
 
     try {
@@ -253,6 +267,38 @@ export function MemberFormDialog({
           <Field label="Plan notes" error={errors.planNotes?.message}>
             <textarea rows={2} {...register("planNotes")} className={areaClass} placeholder="Optional" />
           </Field>
+        </div>
+
+        <div className="mt-8">
+          <h3 className="mb-4 text-sm font-semibold tracking-tight text-foreground/90">Lead Tracking (Optional)</h3>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Lead Status" error={errors.leadStatus?.message}>
+              <Controller
+                name="leadStatus"
+                control={control}
+                render={({ field }) => (
+                  <DropdownSelect
+                    value={(field.value as string) || ""}
+                    onChange={field.onChange}
+                    options={[
+                      { value: "", label: "Not a lead (Active Member)" },
+                      ...LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] })),
+                    ]}
+                    className="w-full"
+                    triggerClassName="h-10 w-full"
+                  />
+                )}
+              />
+            </Field>
+            <Field label="Follow-up Date" error={errors.leadFollowUpAt?.message}>
+              <input type="date" {...register("leadFollowUpAt")} className={fieldClass} />
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label="Lead Notes" error={errors.leadNotes?.message}>
+                <textarea rows={2} {...register("leadNotes")} className={areaClass} placeholder="Optional notes for follow-up..." />
+              </Field>
+            </div>
+          </div>
         </div>
 
         {submitError && (

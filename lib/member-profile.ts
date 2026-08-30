@@ -1,6 +1,17 @@
 import { z } from "zod";
 import { PAYMENT_STATUSES } from "@/lib/plan";
 
+export const LEAD_STATUSES = ["NEW", "CONTACTED", "TRIAL", "CONVERTED", "LOST"] as const;
+export type LeadStatus = (typeof LEAD_STATUSES)[number];
+
+export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  NEW: "🔵 New",
+  CONTACTED: "🟡 Contacted",
+  TRIAL: "🟠 Trial",
+  CONVERTED: "🟢 Converted",
+  LOST: "🔴 Lost",
+};
+
 export const GENDERS = ["MALE", "FEMALE", "OTHER", "UNSPECIFIED"] as const;
 export type Gender = (typeof GENDERS)[number];
 
@@ -30,6 +41,11 @@ const optionalNumber = (max: number) =>
     (value) => (blankToUndefined(value) === undefined ? undefined : Number(value)),
     z.number().positive().max(max).optional(),
   );
+
+const optionalFutureDate = z.preprocess(
+  (value) => (blankToUndefined(value) === undefined ? undefined : new Date(String(value))),
+  z.date().optional(),
+);
 
 const optionalDate = z.preprocess(
   (value) => (blankToUndefined(value) === undefined ? undefined : new Date(String(value))),
@@ -81,8 +97,13 @@ export const adminMemberSchema = z.object({
   emergencyContact: optionalText(120),
   fitnessGoal: optionalText(300),
   paymentStatus: z.enum(PAYMENT_STATUSES).default("UNPAID"),
-  planExpiresAt: optionalDate,
+  planExpiresAt: optionalFutureDate,
   planNotes: optionalText(500),
+  
+  // Lead fields
+  leadStatus: z.preprocess(blankToUndefined, z.enum(LEAD_STATUSES).optional()),
+  leadFollowUpAt: optionalFutureDate,
+  leadNotes: optionalText(1000),
 });
 
 export function getAge(dateOfBirth: Date | null, now = new Date()): number | null {

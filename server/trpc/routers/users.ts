@@ -2,7 +2,11 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { getDefaultPlanId } from "@/lib/default-plan";
-import { adminMemberSchema, JOIN_SOURCES } from "@/lib/member-profile";
+import {
+  adminMemberSchema,
+  JOIN_SOURCES,
+  LEAD_STATUSES,
+} from "@/lib/member-profile";
 import {
   getDaysRemaining,
   getPlanStatus,
@@ -15,6 +19,7 @@ import { adminProcedure, router } from "../init";
 const planFilterSchema = z.enum(["all", ...PLAN_STATUSES]);
 const paymentFilterSchema = z.enum(["all", ...PAYMENT_STATUSES]);
 const joinSourceFilterSchema = z.enum(["all", ...JOIN_SOURCES]);
+const leadStatusFilterSchema = z.enum(["all", "NONE", ...LEAD_STATUSES]);
 
 const memberSelect = {
   id: true,
@@ -32,6 +37,9 @@ const memberSelect = {
   paymentStatus: true,
   planExpiresAt: true,
   planNotes: true,
+  leadStatus: true,
+  leadFollowUpAt: true,
+  leadNotes: true,
   joinSource: true,
   profileCompletedAt: true,
   createdAt: true,
@@ -62,6 +70,9 @@ function toMemberData(input: z.infer<typeof adminMemberSchema>) {
     paymentStatus: input.paymentStatus,
     planExpiresAt: input.planExpiresAt ?? null,
     planNotes: input.planNotes ?? null,
+    leadStatus: input.leadStatus ?? null,
+    leadFollowUpAt: input.leadFollowUpAt ?? null,
+    leadNotes: input.leadNotes ?? null,
   };
 }
 
@@ -73,10 +84,11 @@ export const usersRouter = router({
         planStatus: planFilterSchema.default("all"),
         paymentStatus: paymentFilterSchema.default("all"),
         joinSource: joinSourceFilterSchema.default("all"),
+        leadStatus: leadStatusFilterSchema.default("all"),
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(100).default(10),
         sortBy: z
-          .enum(["name", "planExpiresAt", "createdAt"])
+          .enum(["name", "planExpiresAt", "createdAt", "leadFollowUpAt"])
           .default("name"),
         sortDir: z.enum(["asc", "desc"]).default("asc"),
       }),
@@ -90,6 +102,11 @@ export const usersRouter = router({
           ? {}
           : { paymentStatus: input.paymentStatus }),
         ...(input.joinSource === "all" ? {} : { joinSource: input.joinSource }),
+        ...(input.leadStatus === "all"
+          ? {}
+          : input.leadStatus === "NONE"
+            ? { leadStatus: null }
+            : { leadStatus: input.leadStatus }),
       };
 
       if (input.search) {
@@ -174,6 +191,9 @@ export const usersRouter = router({
         paymentStatus: user.paymentStatus,
         planExpiresAt: user.planExpiresAt,
         planNotes: user.planNotes,
+        leadStatus: user.leadStatus,
+        leadFollowUpAt: user.leadFollowUpAt,
+        leadNotes: user.leadNotes,
         planId: user.planId,
         plan: user.plan,
         payments: user.payments,

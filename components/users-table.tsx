@@ -15,8 +15,11 @@ import {
   getAge,
   JOIN_SOURCES,
   JOIN_SOURCE_LABELS,
+  LEAD_STATUSES,
+  LEAD_STATUS_LABELS,
   type Gender,
   type JoinSource,
+  type LeadStatus,
 } from "@/lib/member-profile";
 import { PAYMENT_STATUSES, type PaymentStatus, type PlanStatus } from "@/lib/plan";
 import { trpc } from "@/lib/trpc";
@@ -45,9 +48,10 @@ export function UsersTable() {
     "all",
   );
   const [joinSource, setJoinSource] = useState<"all" | JoinSource>("all");
+  const [leadStatus, setLeadStatus] = useState<"all" | "NONE" | LeadStatus>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [sortBy, setSortBy] = useState<"name" | "planExpiresAt" | "createdAt">(
+  const [sortBy, setSortBy] = useState<"name" | "planExpiresAt" | "createdAt" | "leadFollowUpAt">(
     "name",
   );
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -71,6 +75,7 @@ export function UsersTable() {
     planStatus,
     paymentStatus,
     joinSource,
+    leadStatus,
     page,
     pageSize,
     sortBy,
@@ -155,6 +160,18 @@ export function UsersTable() {
               setPage(1);
             }}
           />
+          <DropdownSelect
+            value={leadStatus}
+            options={[
+              { value: "all", label: "All leads & members" },
+              { value: "NONE", label: "Active members only" },
+              ...LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] })),
+            ]}
+            onChange={(v) => {
+              setLeadStatus(v as "all" | "NONE" | LeadStatus);
+              setPage(1);
+            }}
+          />
           <Button
             onClick={() => {
               setDialogValues(null);
@@ -196,6 +213,12 @@ export function UsersTable() {
                 </button>
               </th>
               <th className={columnClass}>Payment</th>
+              <th className={columnClass}>Lead Status</th>
+              <th className={columnClass}>
+                <button type="button" onClick={() => toggleSort("leadFollowUpAt")}>
+                  Follow-up{sortIndicator("leadFollowUpAt")}
+                </button>
+              </th>
               <th className={columnClass}>Source</th>
               <th className={columnClass}>
                 <button type="button" onClick={() => toggleSort("createdAt")}>
@@ -278,6 +301,18 @@ export function UsersTable() {
                     </td>
                     <td className={columnClass}>
                       <PaymentBadge status={user.paymentStatus} />
+                    </td>
+                    <td className={columnClass}>
+                      {user.leadStatus ? (
+                        <span className="inline-flex rounded-full bg-accent/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-accent border border-accent/20">
+                          {LEAD_STATUS_LABELS[user.leadStatus as LeadStatus]}
+                        </span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                    <td className={`${columnClass} text-muted`}>
+                      {formatDate(user.leadFollowUpAt)}
                     </td>
                     <td className={`${columnClass} text-muted`}>
                       {JOIN_SOURCE_LABELS[user.joinSource as JoinSource] ??
