@@ -45,23 +45,42 @@ export const paymentsRouter = router({
       z
         .object({
           userId: z.string().min(1).optional(),
+          search: z.string().trim().optional(),
           status: z.enum(["all", ...PAYMENT_RECORD_STATUSES]).default("all"),
+          provider: z.enum(["all", "CASHFREE", "MANUAL"]).default("all"),
           page: z.number().int().min(1).default(1),
           pageSize: z.number().int().min(1).max(100).default(20),
+          sortBy: z.enum(["createdAt", "amountInPaise", "status"]).default("createdAt"),
+          sortDir: z.enum(["asc", "desc"]).default("desc"),
         })
-        .default({ status: "all", page: 1, pageSize: 20 }),
+        .default({ status: "all", provider: "all", page: 1, pageSize: 20, sortBy: "createdAt", sortDir: "desc" }),
     )
     .query(async ({ ctx, input }) => {
       const where: Prisma.PaymentWhereInput = {
         ...(input.userId ? { userId: input.userId } : {}),
         ...(input.status === "all" ? {} : { status: input.status }),
+        ...(input.provider === "all" ? {} : { provider: input.provider }),
+      };
+
+      if (input.search) {
+        where.user = {
+          OR: [
+            { name: { contains: input.search, mode: "insensitive" } },
+            { email: { contains: input.search, mode: "insensitive" } },
+            { phone: { contains: input.search, mode: "insensitive" } },
+          ],
+        };
+      }
+
+      const orderBy: Prisma.PaymentOrderByWithRelationInput = {
+        [input.sortBy]: input.sortDir,
       };
 
       const [total, items, collected] = await ctx.prisma.$transaction([
         ctx.prisma.payment.count({ where }),
         ctx.prisma.payment.findMany({
           where,
-          orderBy: { createdAt: "desc" },
+          orderBy,
           skip: (input.page - 1) * input.pageSize,
           take: input.pageSize,
           select: paymentSelect,
@@ -79,6 +98,49 @@ export const paymentsRouter = router({
         collectedInPaise: collected._sum.amountPaidInPaise ?? 0,
         items,
       };
+    }),
+
+  exportList: adminProcedure
+    .input(
+      z
+        .object({
+          userId: z.string().min(1).optional(),
+          search: z.string().trim().optional(),
+          status: z.enum(["all", ...PAYMENT_RECORD_STATUSES]).default("all"),
+          provider: z.enum(["all", "CASHFREE", "MANUAL"]).default("all"),
+          sortBy: z.enum(["createdAt", "amountInPaise", "status"]).default("createdAt"),
+          sortDir: z.enum(["asc", "desc"]).default("desc"),
+        })
+        .default({ status: "all", provider: "all", sortBy: "createdAt", sortDir: "desc" }),
+    )
+    .query(async ({ ctx, input }) => {
+      const where: Prisma.PaymentWhereInput = {
+        ...(input.userId ? { userId: input.userId } : {}),
+        ...(input.status === "all" ? {} : { status: input.status }),
+        ...(input.provider === "all" ? {} : { provider: input.provider }),
+      };
+
+      if (input.search) {
+        where.user = {
+          OR: [
+            { name: { contains: input.search, mode: "insensitive" } },
+            { email: { contains: input.search, mode: "insensitive" } },
+            { phone: { contains: input.search, mode: "insensitive" } },
+          ],
+        };
+      }
+
+      const orderBy: Prisma.PaymentOrderByWithRelationInput = {
+        [input.sortBy]: input.sortDir,
+      };
+
+      const items = await ctx.prisma.payment.findMany({
+        where,
+        orderBy,
+        select: paymentSelect,
+      });
+
+      return items;
     }),
 
   /** Raises a Cashfree payment link for a member's plan and stores it for tracking. */
