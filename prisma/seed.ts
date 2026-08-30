@@ -14,6 +14,9 @@ function daysFromNow(days: number) {
 }
 
 async function main() {
+  await prisma.expense.deleteMany();
+  await prisma.recurringExpense.deleteMany();
+  await prisma.expenseCategory.deleteMany();
   await prisma.bodyMeasurement.deleteMany();
   await prisma.announcement.deleteMany();
   await prisma.payment.deleteMany();
@@ -181,8 +184,35 @@ async function main() {
     },
   });
 
+  // ── Expense Categories ──────────────────────────────────────
+  const defaultCategories = [
+    { name: "Rent", emoji: "🏢", description: "Gym building rent" },
+    { name: "Electricity", emoji: "⚡", description: "EB bill, generator" },
+    { name: "Water", emoji: "💧", description: "Water bill" },
+    { name: "Salaries", emoji: "👥", description: "Trainers, receptionist, cleaner" },
+    { name: "Internet & Phone", emoji: "📱", description: "Wi-Fi, mobile" },
+    { name: "Cleaning", emoji: "🧹", description: "Cleaning materials/service" },
+    { name: "Equipment", emoji: "🏋️", description: "Repairs, maintenance" },
+    { name: "Maintenance", emoji: "🔧", description: "AC, plumbing, electrical" },
+    { name: "Marketing", emoji: "📣", description: "Instagram, Google Ads, banners" },
+    { name: "Gym Supplies", emoji: "🥤", description: "Water, towels, tissues" },
+    { name: "Software", emoji: "💻", description: "Gym software, subscriptions" },
+    { name: "Loan/EMI", emoji: "🏦", description: "Equipment/building loan" },
+    { name: "Taxes & Fees", emoji: "🧾", description: "GST, licenses, CA fees" },
+    { name: "Insurance", emoji: "🛡️", description: "Gym/property insurance" },
+    { name: "Other", emoji: "📦", description: "Anything else" },
+  ];
+
+  for (const cat of defaultCategories) {
+    await prisma.expenseCategory.upsert({
+      where: { name: cat.name },
+      update: {},
+      create: { ...cat, isDefault: true },
+    });
+  }
+
   console.log(
-    `Seeded ${members.length} members, 3 plans, and 1 announcement.`,
+    `Seeded ${members.length} members, 3 plans, 1 announcement, and ${defaultCategories.length} expense categories.`,
   );
 }
 

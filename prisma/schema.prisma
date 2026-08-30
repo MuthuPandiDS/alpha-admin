@@ -186,3 +186,78 @@ model Announcement {
 
   @@index([startsAt, endsAt])
 }
+
+/// A category for gym operating expenses (e.g. Rent, Electricity, Salaries).
+model ExpenseCategory {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  emoji       String
+  description String?
+  /// true for the 15 seeded default categories; false for admin-created custom ones.
+  isDefault   Boolean @default(false)
+  isActive    Boolean @default(true)
+
+  expenses          Expense[]
+  recurringExpenses RecurringExpense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+/// A recurring expense template that auto-generates individual Expense rows each period.
+model RecurringExpense {
+  id             String   @id @default(cuid())
+  name           String
+  categoryId     String
+  category       ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  /// Amount in paise (same convention as Payment.amountInPaise).
+  amountInPaise  Int
+  currency       String   @default("INR")
+  /// MONTHLY | QUARTERLY | YEARLY | WEEKLY
+  frequency      String   @default("MONTHLY")
+  /// Day of the month the expense is due (1-31). Clamped to month length.
+  dueDay         Int
+  paymentMethod  String?
+  startDate      DateTime
+  endDate        DateTime?
+  isActive       Boolean  @default(true)
+  /// Tracks the last month+year for which an Expense was generated, preventing duplicates.
+  lastGeneratedDate DateTime?
+
+  expenses  Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([categoryId])
+}
+
+/// A single expense entry — either auto-generated from a RecurringExpense or manually created.
+model Expense {
+  id                 String   @id @default(cuid())
+  name               String
+  categoryId         String
+  category           ExpenseCategory  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  recurringExpenseId String?
+  recurringExpense   RecurringExpense? @relation(fields: [recurringExpenseId], references: [id], onDelete: SetNull)
+  /// Amount in paise.
+  amountInPaise      Int
+  currency           String   @default("INR")
+  /// UPCOMING | DUE | PAID | OVERDUE
+  status             String   @default("UPCOMING")
+  dueDate            DateTime
+  paidDate           DateTime?
+  paymentMethod      String?
+  notes              String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([dueDate])
+  @@index([categoryId])
+  @@index([recurringExpenseId])
+}

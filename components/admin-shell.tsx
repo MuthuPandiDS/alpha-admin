@@ -37,6 +37,12 @@ export function AdminShell({
             Payments
           </Link>
           <Link
+            href="/expenses"
+            className="rounded-lg px-3 py-2 text-foreground/90 hover:bg-white/5"
+          >
+            Expenses
+          </Link>
+          <Link
             href="/qr-signup"
             className="rounded-lg px-3 py-2 text-foreground/90 hover:bg-white/5"
           >
