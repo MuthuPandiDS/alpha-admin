@@ -58,17 +58,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const ext = getExtension(file.type);
-  const fileName = `${session.user.id}.${ext}`;
-  const uploadDir = join(process.cwd(), "public", "uploads", "photos");
-
-  await mkdir(uploadDir, { recursive: true });
-
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const filePath = join(uploadDir, fileName);
-  await writeFile(filePath, bytes);
-
-  const url = `/uploads/photos/${fileName}`;
+  const buffer = Buffer.from(bytes);
+  const base64 = buffer.toString("base64");
+  const url = `data:${file.type};base64,${base64}`;
 
   // Update the user's image field in the database
   await prisma.user.update({
