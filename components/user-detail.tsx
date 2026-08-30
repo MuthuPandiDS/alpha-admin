@@ -75,22 +75,20 @@ export function UserDetail({ userId }: { userId: string }) {
         <Link href="/users" className="text-sm text-muted hover:text-foreground">
           ← Members
         </Link>
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <MemberAvatar
-              src={user.image}
-              name={user.name}
-              size="h-16 w-16"
-              textSize="text-xl"
-            />
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {user.name ?? "Unnamed member"}
-              </h1>
-              <p className="text-sm text-muted">{user.email}</p>
-            </div>
+        <div className="mt-8 flex flex-col items-center gap-4 text-center">
+          <MemberAvatar
+            src={user.image}
+            name={user.name}
+            size="h-32 w-32"
+            textSize="text-4xl"
+          />
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              {user.name ?? "Unnamed member"}
+            </h1>
+            <p className="text-base text-muted">{user.email}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="mt-2 flex items-center justify-center gap-2">
             <PlanBadge status={user.planStatus} />
             <PaymentBadge status={user.paymentStatus} />
           </div>
