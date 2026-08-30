@@ -19,6 +19,12 @@ export function AdminShell({
         </p>
         <nav className="mt-8 flex flex-col gap-1 text-sm">
           <Link
+            href="/dashboard"
+            className="rounded-lg px-3 py-2 text-foreground/90 hover:bg-white/5"
+          >
+            Dashboard
+          </Link>
+          <Link
             href="/users"
             className="rounded-lg px-3 py-2 text-foreground/90 hover:bg-white/5"
           >
