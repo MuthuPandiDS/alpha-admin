@@ -1,4 +1,5 @@
 import { signOut } from "@/auth";
+import { LogOut } from "lucide-react";
 import Link from "next/link";
 
 export function AdminShell({
@@ -61,11 +62,28 @@ export function AdminShell({
             Announcements
           </Link>
         </nav>
-        <div className="mt-auto border-t border-card-border pt-4">
-          <p className="truncate text-sm">{user.name ?? "Admin"}</p>
-          <p className="truncate text-xs text-muted">{user.email}</p>
+        <div className="mt-auto flex items-center justify-between gap-3 border-t border-card-border pt-5">
+          <div className="flex items-center gap-3 overflow-hidden">
+            {user.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.image}
+                alt=""
+                className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+              />
+            ) : (
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent ring-1 ring-white/10">
+                {(user.name ?? "A").charAt(0).toUpperCase()}
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-foreground">
+                {user.name ?? "Admin"}
+              </p>
+              <p className="truncate text-xs text-muted">{user.email}</p>
+            </div>
+          </div>
           <form
-            className="mt-3"
             action={async () => {
               "use server";
               await signOut({ redirectTo: "/login" });
@@ -73,9 +91,10 @@ export function AdminShell({
           >
             <button
               type="submit"
-              className="text-sm text-muted underline-offset-4 hover:text-foreground hover:underline"
+              title="Sign out"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-danger"
             >
-              Sign out
+              <LogOut className="h-4 w-4" />
             </button>
           </form>
         </div>
