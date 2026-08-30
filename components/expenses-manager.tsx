@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { formatMoney, paiseToRupees, rupeesToPaise } from "@/lib/membership";
 import { trpc } from "@/lib/trpc";
-import { Button, Spinner } from "@/components/ui-primitives";
+import { Button, DropdownSelect, Spinner } from "@/components/ui-primitives";
 
 /* ─── Constants ──────────────────────────────────────────── */
 
@@ -20,7 +23,22 @@ const FREQUENCIES = [
 ];
 
 const PAYMENT_METHODS = [
-  "Bank Transfer", "UPI", "Cash", "Credit Card", "Debit Card", "Cheque", "Other",
+  { value: "", label: "Not specified" },
+  { value: "Bank Transfer", label: "Bank Transfer" },
+  { value: "UPI", label: "UPI" },
+  { value: "Cash", label: "Cash" },
+  { value: "Credit Card", label: "Credit Card" },
+  { value: "Debit Card", label: "Debit Card" },
+  { value: "Cheque", label: "Cheque" },
+  { value: "Other", label: "Other" },
+];
+
+const STATUS_FILTER_OPTIONS = [
+  { value: "ALL", label: "All statuses" },
+  { value: "PAID", label: "🟢 Paid" },
+  { value: "DUE", label: "🟡 Due" },
+  { value: "UPCOMING", label: "🔵 Upcoming" },
+  { value: "OVERDUE", label: "🔴 Overdue" },
 ];
 
 const STATUS_CONFIG: Record<string, { label: string; dot: string; bg: string; text: string }> = {
@@ -32,20 +50,61 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string; bg: string; te
 
 const fieldClass =
   "h-10 w-full rounded-md border border-card-border bg-card px-3 text-xs text-foreground/90 outline-none transition placeholder:text-muted/60 focus:border-accent focus:ring-1 focus:ring-accent/30";
-const selectClass =
-  "h-10 w-full rounded-md border border-card-border bg-card px-3 text-xs text-foreground/90 outline-none transition focus:border-accent focus:ring-1 focus:ring-accent/30 appearance-none cursor-pointer";
+const fieldErrorClass =
+  "h-10 w-full rounded-md border border-danger/50 bg-card px-3 text-xs text-foreground/90 outline-none transition placeholder:text-muted/60 focus:border-danger focus:ring-1 focus:ring-danger/30";
 
 type Tab = "monthly" | "recurring" | "categories";
 
-/* ─── Field wrapper ──────────────────────────────────────── */
+/* ─── Zod Schemas ────────────────────────────────────────── */
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+const expenseFormSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(120, "Max 120 characters"),
+  categoryId: z.string().min(1, "Category is required"),
+  amountRupees: z.string().min(1, "Amount is required").refine(
+    (v) => !isNaN(Number(v)) && Number(v) > 0,
+    "Must be a positive number",
+  ),
+  dueDate: z.string().min(1, "Due date is required"),
+  paymentMethod: z.string().optional(),
+  notes: z.string().max(1000, "Max 1000 characters").optional(),
+});
+type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
+
+const recurringFormSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(120, "Max 120 characters"),
+  categoryId: z.string().min(1, "Category is required"),
+  amountRupees: z.string().min(1, "Amount is required").refine(
+    (v) => !isNaN(Number(v)) && Number(v) > 0,
+    "Must be a positive number",
+  ),
+  frequency: z.string().min(1, "Frequency is required"),
+  dueDay: z.string().min(1, "Due day is required").refine(
+    (v) => { const n = Number(v); return !isNaN(n) && n >= 1 && n <= 31; },
+    "Must be between 1 and 31",
+  ),
+  paymentMethod: z.string().optional(),
+  startDate: z.string().min(1, "Start date is required"),
+  endDate: z.string().optional(),
+});
+type RecurringFormValues = z.infer<typeof recurringFormSchema>;
+
+const categoryFormSchema = z.object({
+  emoji: z.string().trim().min(1, "Emoji is required").max(10),
+  name: z.string().trim().min(1, "Name is required").max(60, "Max 60 characters"),
+  description: z.string().max(200, "Max 200 characters").optional(),
+});
+type CategoryFormValues = z.infer<typeof categoryFormSchema>;
+
+/* ─── Field wrapper with error support ───────────────────── */
+
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <label className="block">
       <span className="text-[11px] font-medium uppercase tracking-wider text-muted">
         {label}
       </span>
       <div className="mt-1.5">{children}</div>
+      {error && <p className="mt-1.5 text-[11px] text-danger">{error}</p>}
     </label>
   );
 }
@@ -127,6 +186,11 @@ function MonthlyOverview() {
   const updateStatus = trpc.expenses.updateStatus.useMutation({ onSuccess: invalidate });
   const deleteExpense = trpc.expenses.delete.useMutation({ onSuccess: invalidate });
 
+  const categoryFilterOptions = [
+    { value: "", label: "All categories" },
+    ...(categories.data?.map((c) => ({ value: c.id, label: `${c.emoji} ${c.name}` })) ?? []),
+  ];
+
   function prevMonth() {
     if (month === 0) { setMonth(11); setYear((y) => y - 1); }
     else setMonth((m) => m - 1);
@@ -167,21 +231,22 @@ function MonthlyOverview() {
         </div>
       )}
 
-      {/* Filters */}
+      {/* Filters — using DropdownSelect */}
       <div className="flex flex-wrap gap-3">
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={`${selectClass} max-w-[160px]`}>
-          <option value="ALL">All statuses</option>
-          <option value="PAID">🟢 Paid</option>
-          <option value="DUE">🟡 Due</option>
-          <option value="UPCOMING">🔵 Upcoming</option>
-          <option value="OVERDUE">🔴 Overdue</option>
-        </select>
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={`${selectClass} max-w-[200px]`}>
-          <option value="">All categories</option>
-          {categories.data?.map((cat) => (
-            <option key={cat.id} value={cat.id}>{cat.emoji} {cat.name}</option>
-          ))}
-        </select>
+        <DropdownSelect
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={STATUS_FILTER_OPTIONS}
+          className="w-[160px]"
+          triggerClassName="h-9 w-full"
+        />
+        <DropdownSelect
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+          options={categoryFilterOptions}
+          className="w-[200px]"
+          triggerClassName="h-9 w-full"
+        />
       </div>
 
       {/* Expenses table */}
@@ -302,7 +367,7 @@ function SummaryCard({ label, amount, icon, accent }: { label: string; amount: n
   );
 }
 
-/* ─── Expense Form Dialog ────────────────────────────────── */
+/* ─── Expense Form Dialog (react-hook-form + DropdownSelect) */
 
 type CategoryData = { id: string; name: string; emoji: string };
 
@@ -315,70 +380,110 @@ function ExpenseFormDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
-  const [amountRupees, setAmountRupees] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
-  const [notes, setNotes] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const categoryOptions = categories.map((c) => ({
+    value: c.id,
+    label: `${c.emoji} ${c.name}`,
+  }));
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ExpenseFormValues>({
+    resolver: zodResolver(expenseFormSchema),
+    defaultValues: {
+      name: "",
+      categoryId: categories[0]?.id ?? "",
+      amountRupees: "",
+      dueDate: "",
+      paymentMethod: "",
+      notes: "",
+    },
+  });
 
   const create = trpc.expenses.create.useMutation({ onSuccess: onSaved });
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    create.mutate({
-      name,
-      categoryId,
-      amountInPaise: rupeesToPaise(Number(amountRupees || 0)),
-      dueDate: new Date(dueDate),
-      paymentMethod: paymentMethod || undefined,
-      notes: notes || undefined,
-    });
-  }
+  const onSubmit = async (values: ExpenseFormValues) => {
+    setSubmitError(null);
+    try {
+      await create.mutateAsync({
+        name: values.name,
+        categoryId: values.categoryId,
+        amountInPaise: rupeesToPaise(Number(values.amountRupees)),
+        dueDate: new Date(values.dueDate),
+        paymentMethod: values.paymentMethod || undefined,
+        notes: values.notes || undefined,
+      });
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to create expense.");
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-md overflow-hidden rounded-xl border border-card-border bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-card-border px-6 py-4">
           <h3 className="font-semibold text-foreground">Add Expense</h3>
-          <button type="button" onClick={onClose} className="cursor-pointer text-muted hover:text-foreground">
+          <button type="button" onClick={onClose} className="cursor-pointer rounded-md p-1.5 text-muted transition hover:bg-white/5 hover:text-foreground">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-        <form onSubmit={submit} className="space-y-4 p-6">
-          <Field label="Expense Name">
-            <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. September Rent" className={fieldClass} />
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 p-6">
+          <Field label="Expense Name" error={errors.name?.message}>
+            <input {...register("name")} placeholder="e.g. September Rent" className={errors.name ? fieldErrorClass : fieldClass} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Category">
-              <select required value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={selectClass}>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
-              </select>
+            <Field label="Category" error={errors.categoryId?.message}>
+              <Controller
+                name="categoryId"
+                control={control}
+                render={({ field }) => (
+                  <DropdownSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={categoryOptions}
+                    className="w-full"
+                    triggerClassName="h-10 w-full"
+                  />
+                )}
+              />
             </Field>
-            <Field label="Amount (₹)">
-              <input required type="number" min="0" step="0.01" value={amountRupees} onChange={(e) => setAmountRupees(e.target.value)} className={fieldClass} />
+            <Field label="Amount (₹)" error={errors.amountRupees?.message}>
+              <input type="number" min="0" step="0.01" {...register("amountRupees")} className={errors.amountRupees ? fieldErrorClass : fieldClass} />
             </Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Due Date">
-              <input required type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={fieldClass} />
+            <Field label="Due Date" error={errors.dueDate?.message}>
+              <input type="date" {...register("dueDate")} className={errors.dueDate ? fieldErrorClass : fieldClass} />
             </Field>
-            <Field label="Payment Method">
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={selectClass}>
-                <option value="">None</option>
-                {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
+            <Field label="Payment Method" error={errors.paymentMethod?.message}>
+              <Controller
+                name="paymentMethod"
+                control={control}
+                render={({ field }) => (
+                  <DropdownSelect
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    options={PAYMENT_METHODS}
+                    className="w-full"
+                    triggerClassName="h-10 w-full"
+                  />
+                )}
+              />
             </Field>
           </div>
-          <Field label="Notes">
-            <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes..." className={fieldClass} />
+          <Field label="Notes" error={errors.notes?.message}>
+            <input {...register("notes")} placeholder="Optional notes..." className={errors.notes ? fieldErrorClass : fieldClass} />
           </Field>
-          {create.error && (
+          {submitError && (
             <p className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
-              {create.error.message}
+              {submitError}
             </p>
           )}
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 border-t border-card-border pt-4">
             <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
             <Button type="submit" disabled={create.isPending}>
               {create.isPending ? "Adding…" : "Add Expense"}
@@ -394,31 +499,6 @@ function ExpenseFormDialog({
    TAB 2: RECURRING EXPENSES
    ═══════════════════════════════════════════════════════════ */
 
-type RecurringDraft = {
-  id?: string;
-  name: string;
-  categoryId: string;
-  amountRupees: string;
-  frequency: string;
-  dueDay: string;
-  paymentMethod: string;
-  startDate: string;
-  endDate: string;
-};
-
-function emptyRecurringDraft(defaultCategoryId: string): RecurringDraft {
-  return {
-    name: "",
-    categoryId: defaultCategoryId,
-    amountRupees: "",
-    frequency: "MONTHLY",
-    dueDay: "5",
-    paymentMethod: "",
-    startDate: new Date().toISOString().split("T")[0],
-    endDate: "",
-  };
-}
-
 function RecurringTab() {
   const categories = trpc.expenses.categoriesList.useQuery();
   const recurring = trpc.expenses.recurringList.useQuery();
@@ -429,111 +509,36 @@ function RecurringTab() {
     utils.expenses.monthlySummary.invalidate();
   };
 
-  const [draft, setDraft] = useState<RecurringDraft>(emptyRecurringDraft(""));
-
-  // Set default categoryId once loaded
   const defaultCatId = categories.data?.[0]?.id ?? "";
-  if (!draft.categoryId && defaultCatId) {
-    setDraft((d) => ({ ...d, categoryId: defaultCatId }));
-  }
 
-  const create = trpc.expenses.recurringCreate.useMutation({
-    onSuccess: () => { invalidate(); setDraft(emptyRecurringDraft(defaultCatId)); },
-  });
-  const update = trpc.expenses.recurringUpdate.useMutation({
-    onSuccess: () => { invalidate(); setDraft(emptyRecurringDraft(defaultCatId)); },
-  });
+  const create = trpc.expenses.recurringCreate.useMutation({ onSuccess: invalidate });
+  const update = trpc.expenses.recurringUpdate.useMutation({ onSuccess: invalidate });
   const remove = trpc.expenses.recurringDelete.useMutation({ onSuccess: invalidate });
   const toggle = trpc.expenses.recurringToggle.useMutation({ onSuccess: invalidate });
   const generateDue = trpc.expenses.recurringGenerateDue.useMutation({ onSuccess: invalidate });
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const payload = {
-      name: draft.name,
-      categoryId: draft.categoryId,
-      amountInPaise: rupeesToPaise(Number(draft.amountRupees || 0)),
-      frequency: draft.frequency as "MONTHLY" | "QUARTERLY" | "YEARLY" | "WEEKLY",
-      dueDay: Number(draft.dueDay || 1),
-      paymentMethod: draft.paymentMethod || undefined,
-      startDate: new Date(draft.startDate),
-      endDate: draft.endDate ? new Date(draft.endDate) : null,
-    };
-    if (draft.id) {
-      update.mutate({ id: draft.id, ...payload });
-    } else {
-      create.mutate(payload);
-    }
-  }
+  const [editId, setEditId] = useState<string | null>(null);
+
+  const categoryOptions = categories.data?.map((c) => ({
+    value: c.id,
+    label: `${c.emoji} ${c.name}`,
+  })) ?? [];
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
       {/* Form */}
-      <form onSubmit={submit} className="h-fit space-y-6 rounded-xl border border-card-border bg-card p-6">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground/90">
-            {draft.id ? "Edit recurring expense" : "New recurring expense"}
-          </h2>
-          <p className="mt-1 text-xs text-muted">
-            Set up expenses that repeat automatically.
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          <Field label="Expense Name">
-            <input required value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} placeholder="e.g. Gym Rent" className={fieldClass} />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Category">
-              <select required value={draft.categoryId} onChange={(e) => setDraft((d) => ({ ...d, categoryId: e.target.value }))} className={selectClass}>
-                {categories.data?.map((c) => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Amount (₹)">
-              <input required type="number" min="0" step="0.01" value={draft.amountRupees} onChange={(e) => setDraft((d) => ({ ...d, amountRupees: e.target.value }))} className={fieldClass} />
-            </Field>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Frequency">
-              <select required value={draft.frequency} onChange={(e) => setDraft((d) => ({ ...d, frequency: e.target.value }))} className={selectClass}>
-                {FREQUENCIES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Due Day (of month)">
-              <input required type="number" min="1" max="31" value={draft.dueDay} onChange={(e) => setDraft((d) => ({ ...d, dueDay: e.target.value }))} className={fieldClass} />
-            </Field>
-          </div>
-          <Field label="Payment Method">
-            <select value={draft.paymentMethod} onChange={(e) => setDraft((d) => ({ ...d, paymentMethod: e.target.value }))} className={selectClass}>
-              <option value="">Not specified</option>
-              {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Start Date">
-              <input required type="date" value={draft.startDate} onChange={(e) => setDraft((d) => ({ ...d, startDate: e.target.value }))} className={fieldClass} />
-            </Field>
-            <Field label="End Date">
-              <input type="date" value={draft.endDate} onChange={(e) => setDraft((d) => ({ ...d, endDate: e.target.value }))} className={fieldClass} placeholder="No end date" />
-            </Field>
-          </div>
-        </div>
-
-        {(create.error || update.error) && (
-          <p className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
-            {create.error?.message ?? update.error?.message}
-          </p>
-        )}
-
-        <div className="flex justify-end gap-3 border-t border-card-border pt-6">
-          {draft.id && (
-            <Button type="button" variant="ghost" onClick={() => setDraft(emptyRecurringDraft(defaultCatId))}>Cancel</Button>
-          )}
-          <Button type="submit" disabled={create.isPending || update.isPending}>
-            {draft.id ? "Save changes" : "Create recurring expense"}
-          </Button>
-        </div>
-      </form>
+      <RecurringForm
+        key={editId ?? "new"}
+        editId={editId}
+        defaultCategoryId={defaultCatId}
+        categoryOptions={categoryOptions}
+        editData={editId ? recurring.data?.find((r) => r.id === editId) : undefined}
+        onCreate={(payload) => create.mutateAsync(payload)}
+        onUpdate={(payload) => update.mutateAsync(payload)}
+        onCancel={() => setEditId(null)}
+        isPending={create.isPending || update.isPending}
+        error={create.error?.message ?? update.error?.message}
+      />
 
       {/* List */}
       <div className="flex min-w-0 flex-col gap-6">
@@ -603,17 +608,7 @@ function RecurringTab() {
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-card-border bg-black/20 px-5 py-3">
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setDraft({
-                      id: rec.id,
-                      name: rec.name,
-                      categoryId: rec.categoryId,
-                      amountRupees: String(paiseToRupees(rec.amountInPaise)),
-                      frequency: rec.frequency,
-                      dueDay: String(rec.dueDay),
-                      paymentMethod: rec.paymentMethod ?? "",
-                      startDate: new Date(rec.startDate).toISOString().split("T")[0],
-                      endDate: rec.endDate ? new Date(rec.endDate).toISOString().split("T")[0] : "",
-                    })}>
+                    <Button variant="ghost" size="sm" onClick={() => setEditId(rec.id)}>
                       Edit
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => toggle.mutate({ id: rec.id, isActive: !rec.isActive })}>
@@ -635,6 +630,187 @@ function RecurringTab() {
   );
 }
 
+/* ─── Recurring Form (react-hook-form) ───────────────────── */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function RecurringForm({
+  editId,
+  defaultCategoryId,
+  categoryOptions,
+  editData,
+  onCreate,
+  onUpdate,
+  onCancel,
+  isPending,
+  error,
+}: {
+  editId: string | null;
+  defaultCategoryId: string;
+  categoryOptions: { value: string; label: string }[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  editData?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onCreate: (payload: any) => Promise<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onUpdate: (payload: any) => Promise<any>;
+  onCancel: () => void;
+  isPending: boolean;
+  error?: string;
+}) {
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<RecurringFormValues>({
+    resolver: zodResolver(recurringFormSchema),
+    defaultValues: editData
+      ? {
+          name: editData.name,
+          categoryId: editData.categoryId,
+          amountRupees: String(paiseToRupees(editData.amountInPaise)),
+          frequency: editData.frequency,
+          dueDay: String(editData.dueDay),
+          paymentMethod: editData.paymentMethod ?? "",
+          startDate: new Date(editData.startDate).toISOString().split("T")[0],
+          endDate: editData.endDate ? new Date(editData.endDate).toISOString().split("T")[0] : "",
+        }
+      : {
+          name: "",
+          categoryId: defaultCategoryId,
+          amountRupees: "",
+          frequency: "MONTHLY",
+          dueDay: "5",
+          paymentMethod: "",
+          startDate: new Date().toISOString().split("T")[0],
+          endDate: "",
+        },
+  });
+
+  const onSubmit = async (values: RecurringFormValues) => {
+    setSubmitError(null);
+    const payload = {
+      name: values.name,
+      categoryId: values.categoryId,
+      amountInPaise: rupeesToPaise(Number(values.amountRupees)),
+      frequency: values.frequency as "MONTHLY" | "QUARTERLY" | "YEARLY" | "WEEKLY",
+      dueDay: Number(values.dueDay),
+      paymentMethod: values.paymentMethod || undefined,
+      startDate: new Date(values.startDate),
+      endDate: values.endDate ? new Date(values.endDate) : null,
+    };
+    try {
+      if (editId) {
+        await onUpdate({ id: editId, ...payload });
+      } else {
+        await onCreate(payload);
+      }
+      onCancel();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to save.");
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="h-fit space-y-6 rounded-xl border border-card-border bg-card p-6">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight text-foreground/90">
+          {editId ? "Edit recurring expense" : "New recurring expense"}
+        </h2>
+        <p className="mt-1 text-xs text-muted">
+          Set up expenses that repeat automatically.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <Field label="Expense Name" error={errors.name?.message}>
+          <input {...register("name")} placeholder="e.g. Gym Rent" className={errors.name ? fieldErrorClass : fieldClass} />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Category" error={errors.categoryId?.message}>
+            <Controller
+              name="categoryId"
+              control={control}
+              render={({ field }) => (
+                <DropdownSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={categoryOptions}
+                  className="w-full"
+                  triggerClassName="h-10 w-full"
+                />
+              )}
+            />
+          </Field>
+          <Field label="Amount (₹)" error={errors.amountRupees?.message}>
+            <input type="number" min="0" step="0.01" {...register("amountRupees")} className={errors.amountRupees ? fieldErrorClass : fieldClass} />
+          </Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Frequency" error={errors.frequency?.message}>
+            <Controller
+              name="frequency"
+              control={control}
+              render={({ field }) => (
+                <DropdownSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={FREQUENCIES}
+                  className="w-full"
+                  triggerClassName="h-10 w-full"
+                />
+              )}
+            />
+          </Field>
+          <Field label="Due Day (of month)" error={errors.dueDay?.message}>
+            <input type="number" min="1" max="31" {...register("dueDay")} className={errors.dueDay ? fieldErrorClass : fieldClass} />
+          </Field>
+        </div>
+        <Field label="Payment Method" error={errors.paymentMethod?.message}>
+          <Controller
+            name="paymentMethod"
+            control={control}
+            render={({ field }) => (
+              <DropdownSelect
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                options={PAYMENT_METHODS}
+                className="w-full"
+                triggerClassName="h-10 w-full"
+              />
+            )}
+          />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Start Date" error={errors.startDate?.message}>
+            <input type="date" {...register("startDate")} className={errors.startDate ? fieldErrorClass : fieldClass} />
+          </Field>
+          <Field label="End Date" error={errors.endDate?.message}>
+            <input type="date" {...register("endDate")} className={errors.endDate ? fieldErrorClass : fieldClass} />
+          </Field>
+        </div>
+      </div>
+
+      {(error || submitError) && (
+        <p className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+          {error ?? submitError}
+        </p>
+      )}
+
+      <div className="flex justify-end gap-3 border-t border-card-border pt-6">
+        {editId && (
+          <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+        )}
+        <Button type="submit" disabled={isPending}>
+          {editId ? "Save changes" : "Create recurring expense"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function ordinalSuffix(n: number): string {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
@@ -651,43 +827,23 @@ function CategoriesTab() {
   const invalidate = () => utils.expenses.categoriesList.invalidate();
 
   const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState("");
-  const [description, setDescription] = useState("");
+  const [editCat, setEditCat] = useState<{ id: string; name: string; emoji: string; description: string | null } | null>(null);
 
-  const create = trpc.expenses.categoriesCreate.useMutation({
-    onSuccess: () => { invalidate(); resetForm(); },
-  });
-  const update = trpc.expenses.categoriesUpdate.useMutation({
-    onSuccess: () => { invalidate(); resetForm(); },
-  });
   const remove = trpc.expenses.categoriesDelete.useMutation({ onSuccess: invalidate });
 
-  function resetForm() {
-    setShowForm(false);
-    setEditId(null);
-    setName("");
-    setEmoji("");
-    setDescription("");
-  }
-
-  function startEdit(cat: { id: string; name: string; emoji: string; description: string | null }) {
-    setEditId(cat.id);
-    setName(cat.name);
-    setEmoji(cat.emoji);
-    setDescription(cat.description ?? "");
+  function openCreate() {
+    setEditCat(null);
     setShowForm(true);
   }
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const payload = { name, emoji, description: description || undefined };
-    if (editId) {
-      update.mutate({ id: editId, ...payload });
-    } else {
-      create.mutate(payload);
-    }
+  function openEdit(cat: { id: string; name: string; emoji: string; description: string | null }) {
+    setEditCat(cat);
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditCat(null);
   }
 
   return (
@@ -696,7 +852,7 @@ function CategoriesTab() {
         <p className="text-sm text-muted">
           {categories.data?.length ?? 0} categories
         </p>
-        <Button onClick={() => { resetForm(); setShowForm(true); }}>
+        <Button onClick={openCreate}>
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Add Category
         </Button>
@@ -728,7 +884,7 @@ function CategoriesTab() {
               <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
                 <button
                   type="button"
-                  onClick={() => startEdit(cat)}
+                  onClick={() => openEdit(cat)}
                   className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md bg-white/5 text-muted transition hover:bg-white/10 hover:text-foreground"
                   title="Edit"
                 >
@@ -752,45 +908,100 @@ function CategoriesTab() {
         </div>
       )}
 
-      {/* Category form dialog */}
+      {/* Category form dialog (react-hook-form) */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-sm overflow-hidden rounded-xl border border-card-border bg-card shadow-2xl">
-            <div className="flex items-center justify-between border-b border-card-border px-6 py-4">
-              <h3 className="font-semibold text-foreground">
-                {editId ? "Edit Category" : "New Category"}
-              </h3>
-              <button type="button" onClick={resetForm} className="cursor-pointer text-muted hover:text-foreground">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-            <form onSubmit={submit} className="space-y-4 p-6">
-              <div className="grid grid-cols-[4rem_1fr] gap-4">
-                <Field label="Emoji">
-                  <input required value={emoji} onChange={(e) => setEmoji(e.target.value)} placeholder="🏢" className={fieldClass} maxLength={10} />
-                </Field>
-                <Field label="Category Name">
-                  <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Transport" className={fieldClass} />
-                </Field>
-              </div>
-              <Field label="Description">
-                <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional examples..." className={fieldClass} />
-              </Field>
-              {(create.error || update.error) && (
-                <p className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
-                  {create.error?.message ?? update.error?.message}
-                </p>
-              )}
-              <div className="flex justify-end gap-3 pt-2">
-                <Button type="button" variant="ghost" onClick={resetForm}>Cancel</Button>
-                <Button type="submit" disabled={create.isPending || update.isPending}>
-                  {editId ? "Save changes" : "Add Category"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <CategoryFormDialog
+          editCat={editCat}
+          onClose={closeForm}
+          onSaved={() => { invalidate(); closeForm(); }}
+        />
       )}
+    </div>
+  );
+}
+
+/* ─── Category Form Dialog (react-hook-form) ─────────────── */
+
+function CategoryFormDialog({
+  editCat,
+  onClose,
+  onSaved,
+}: {
+  editCat: { id: string; name: string; emoji: string; description: string | null } | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<CategoryFormValues>({
+    resolver: zodResolver(categoryFormSchema),
+    defaultValues: editCat
+      ? { emoji: editCat.emoji, name: editCat.name, description: editCat.description ?? "" }
+      : { emoji: "", name: "", description: "" },
+  });
+
+  const create = trpc.expenses.categoriesCreate.useMutation({ onSuccess: onSaved });
+  const update = trpc.expenses.categoriesUpdate.useMutation({ onSuccess: onSaved });
+  const pending = create.isPending || update.isPending;
+
+  const onSubmit = async (values: CategoryFormValues) => {
+    setSubmitError(null);
+    const payload = {
+      name: values.name,
+      emoji: values.emoji,
+      description: values.description || undefined,
+    };
+    try {
+      if (editCat) {
+        await update.mutateAsync({ id: editCat.id, ...payload });
+      } else {
+        await create.mutateAsync(payload);
+      }
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to save category.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-sm overflow-hidden rounded-xl border border-card-border bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b border-card-border px-6 py-4">
+          <h3 className="font-semibold text-foreground">
+            {editCat ? "Edit Category" : "New Category"}
+          </h3>
+          <button type="button" onClick={onClose} className="cursor-pointer rounded-md p-1.5 text-muted transition hover:bg-white/5 hover:text-foreground">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 p-6">
+          <div className="grid grid-cols-[4rem_1fr] gap-4">
+            <Field label="Emoji" error={errors.emoji?.message}>
+              <input {...register("emoji")} placeholder="🏢" className={errors.emoji ? fieldErrorClass : fieldClass} maxLength={10} />
+            </Field>
+            <Field label="Category Name" error={errors.name?.message}>
+              <input {...register("name")} placeholder="e.g. Transport" className={errors.name ? fieldErrorClass : fieldClass} />
+            </Field>
+          </div>
+          <Field label="Description" error={errors.description?.message}>
+            <input {...register("description")} placeholder="Optional examples..." className={errors.description ? fieldErrorClass : fieldClass} />
+          </Field>
+          {submitError && (
+            <p className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+              {submitError}
+            </p>
+          )}
+          <div className="flex justify-end gap-3 border-t border-card-border pt-4">
+            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={pending}>
+              {editCat ? "Save changes" : "Add Category"}
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
