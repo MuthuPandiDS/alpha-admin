@@ -4,16 +4,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getDefaultPlanId } from "@/lib/default-plan";
-import { memberOnboardingSchema } from "@/lib/member-profile";
+import type { MemberOnboardingInput } from "@/lib/member-profile";
 import type { OnboardingState } from "@/lib/onboarding-state";
 import type { PaymentActionState } from "@/lib/payment-action-state";
 import { prisma } from "@/lib/prisma";
 import { startMemberPayment, syncMemberPayments } from "@/server/member-payments";
 
 export async function submitMemberProfile(
-  _prevState: OnboardingState,
-  formData: FormData,
-): Promise<OnboardingState> {
+  profile: MemberOnboardingInput,
+): Promise<{ status: "success" } | { status: "error"; message: string }> {
   const session = await auth();
   if (!session?.user?.id) {
     return {
@@ -22,21 +21,6 @@ export async function submitMemberProfile(
     };
   }
 
-  const parsed = memberOnboardingSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) {
-    const fieldErrors: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      const key = String(issue.path[0] ?? "form");
-      fieldErrors[key] ??= issue.message;
-    }
-    return {
-      status: "error",
-      message: "Please fix the highlighted fields.",
-      fieldErrors,
-    };
-  }
-
-  const profile = parsed.data;
   const current = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { planId: true },

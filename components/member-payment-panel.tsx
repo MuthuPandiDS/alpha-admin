@@ -88,6 +88,9 @@ export function MemberPaymentPanel({
     );
 
   const isRenewal = payments.some((payment) => payment.status === "PAID");
+  const expiry = planExpiresAt ? new Date(planExpiresAt) : null;
+  const daysLeft = getDaysRemaining(expiry);
+  const isActive = expiry !== null && daysLeft !== null && daysLeft >= 0;
 
   return (
     <section className="mt-8 rounded-xl border border-card-border bg-background/40 p-5">
@@ -155,7 +158,7 @@ export function MemberPaymentPanel({
             </form>
           </div>
         </div>
-      ) : (
+      ) : isActive ? null : (
         <form action={payAction} className="mt-5">
           <button
             type="submit"
